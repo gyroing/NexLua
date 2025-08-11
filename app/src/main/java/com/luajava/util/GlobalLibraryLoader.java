@@ -2,8 +2,6 @@ package com.luajava.util;
 
 import com.luajava.LuaNatives;
 
-import java.io.File;
-
 /**
  * Android专用的本地库加载器
  * 支持使用标准Android方式加载本地库

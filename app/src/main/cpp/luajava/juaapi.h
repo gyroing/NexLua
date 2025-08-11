@@ -35,6 +35,8 @@ static int pushJ(lua_State * L, jobject obj) {
     jthrowable e = env->ExceptionOccurred(); \
     if (e != NULL)
 
+void luaJ_overloadrequire(lua_State * L);
+
 int jclassIndex(lua_State * L);
 int jclassNewIndex(lua_State * L);
 int jclassCall(lua_State * L);

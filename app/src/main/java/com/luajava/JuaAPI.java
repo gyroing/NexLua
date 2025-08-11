@@ -25,7 +25,7 @@ package com.luajava;
 
 
 import com.luajava.util.ClassUtils;
-import com.luajava.util.LRUCache;
+import com.luajava.util.LRUCacheFactory;
 import com.luajava.value.LuaValue;
 
 import java.lang.reflect.*;
@@ -384,9 +384,8 @@ public abstract class JuaAPI {
         return fieldNewIndex(index, obj.getClass(), obj, name);
     }
 
-    private final static LRUCache<Class<?>, Boolean, Constructor<?>[]> CONSTRUCTORS_CACHE = new LRUCache<>(
+    private final static LRUCacheFactory.LRUCacheSingle<Class<?>, Constructor<?>[]> CONSTRUCTORS_CACHE = new LRUCacheFactory.LRUCacheSingle<>(
             25,
-            1,
             4
     );
 
@@ -417,10 +416,10 @@ public abstract class JuaAPI {
             }
         }
         Object[] objects = new Object[paramCount];
-        Constructor<?>[] constructors = CONSTRUCTORS_CACHE.get(clazz, Boolean.TRUE);
+        Constructor<?>[] constructors = CONSTRUCTORS_CACHE.get(clazz);
         if (constructors == null) {
             constructors = clazz.getConstructors();
-            CONSTRUCTORS_CACHE.put(clazz, Boolean.TRUE, constructors);
+            CONSTRUCTORS_CACHE.put(clazz, constructors);
         }
         Constructor<?> constructor = matchMethod(L, constructors, CONSTRUCTOR_WRAPPER, objects);
         if (constructor != null) {
@@ -619,7 +618,7 @@ public abstract class JuaAPI {
         }
     }
 
-    private final static LRUCache<Class<?>, String, Method[]> MEMBER_METHOD_CACHE = new LRUCache<>(
+    private final static LRUCacheFactory.LRUCache<Class<?>, String, Method[]> MEMBER_METHOD_CACHE = new LRUCacheFactory.LRUCache<>(
             25,
             10,
             4
@@ -790,7 +789,7 @@ public abstract class JuaAPI {
         }
     }
 
-    private final static LRUCache<Class<?>, String, OptionalField> OBJECT_FIELD_CACHE = new LRUCache<>(
+    private final static LRUCacheFactory.LRUCache<Class<?>, String, OptionalField> OBJECT_FIELD_CACHE = new LRUCacheFactory.LRUCache<>(
             25,
             10,
             4
@@ -897,13 +896,13 @@ public abstract class JuaAPI {
         return null;
     }
 
-    private final static LRUCache<Class<?>, String, Constructor<?>> CONSTRUCTOR_CACHE = new LRUCache<>(
+    private final static LRUCacheFactory.LRUCache<Class<?>, String, Constructor<?>> CONSTRUCTOR_CACHE = new LRUCacheFactory.LRUCache<>(
             25,
             5,
             4
     );
 
-    private final static LRUCache<Class<?>, String, Method> METHOD_CACHE = new LRUCache<>(
+    private final static LRUCacheFactory.LRUCache<Class<?>, String, Method> METHOD_CACHE = new LRUCacheFactory.LRUCache<>(
             25,
             50,
             4

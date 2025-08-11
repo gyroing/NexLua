@@ -3,6 +3,54 @@
 
 #include "jua.h"
 
+/**
+ * A custom 'require' function that can load modules from a string.
+ * If the second argument is a string, it's treated as the module's code.
+ * Otherwise, it calls the original 'require' function.
+ */
+static int luaJ_require(lua_State *L) {
+    if (lua_gettop(L) >= 2 && lua_isstring(L, 2)) {
+        const char *name = luaL_checkstring(L, 1);
+        size_t sz;
+        const char *code = luaL_checklstring(L, 2, &sz);
+
+        lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+        lua_getfield(L, -1, name);
+        if (!lua_isnil(L, -1)) {
+            return 1;
+        }
+        lua_pop(L, 2);
+        if (luaL_loadbuffer(L, code, sz, name) != 0) {
+            return luaL_error(L, "error loading module '%s' from string:\n\t%s", name, lua_tostring(L, -1));
+        }
+        lua_call(L, 0, 1);
+        lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+        lua_pushvalue(L, -2);
+        lua_setfield(L, -2, name);
+        lua_pop(L, 1);
+        return 1;
+    } else {
+        lua_pushvalue(L, lua_upvalueindex(1));
+        lua_insert(L, 1);
+        lua_call(L, lua_gettop(L) - 1, LUA_MULTRET);
+        return lua_gettop(L);
+    }
+}
+
+/**
+ * Call this function once when initializing a new Lua state to
+ * replace the global 'require' with our custom one.
+ */
+void luaJ_overloadrequire(lua_State *L) {
+    lua_getglobal(L, "require");
+    if (lua_isfunction(L, -1)) {
+        lua_pushcclosure(L, &luaJ_require, 1);
+        lua_setglobal(L, "require");
+    } else {
+        lua_pop(L, 1);
+    }
+}
+
 inline int jInvokeObject(lua_State * L, jmethodID methodID,
                          jobject data, const char * name, int params) {
     JNIEnv * env = getJNIEnv(L);

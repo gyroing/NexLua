@@ -292,6 +292,7 @@ void initMetaRegistry(lua_State * L) {
     lua_setfield(L, -2, LUA_METAFIELD_NEWINDEX);
   }
   lua_pop(L, 1);
+  luaJ_overloadrequire(L);
 }
 
 int getMainThreadId(lua_State * L) {
