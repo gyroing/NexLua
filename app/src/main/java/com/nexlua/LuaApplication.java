@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.preference.PreferenceManager;
 
+import com.luajava.JuaAPI;
 import com.luajava.Lua;
 import com.luajava.Lua.LuaType;
 import com.luajava.luajit.LuaJit;
@@ -43,6 +44,7 @@ public class LuaApplication extends Application implements LuaContext {
         super.onCreate();
         mApplication = this;
         mSharedPreferences = getSharedPreferences(this);
+        JuaAPI.setContext(this);
         initializeLua();
         initializeLuaEvent();
         luaPath = getLuaPath("app.lua");
@@ -181,20 +183,30 @@ public class LuaApplication extends Application implements LuaContext {
         luaLibDir = getDir("lua", Context.MODE_PRIVATE).getAbsolutePath();
         luaCpath = getApplicationInfo().nativeLibraryDir + "/lib?.so" + ";" + libDir + "/lib?.so";
         luaLpath = luaLibDir + "/?.lua;" + luaLibDir + "/lua/?.lua;" + luaLibDir + "/?/init.lua;";
+
         L = new LuaJit();
-        for (String libraryName : new String[]{"package", "string", "table", "math", "io", "os", "debug"})
+        for (String libraryName : new String[]{"package", "string", "table", "math", "io", "os", "debug"}) {
             L.openLibrary(libraryName);
-        // 插入全局 LuaApplication
-        L.pushJavaObject(LuaApplication.this);
+        }
+
+        L.pushJavaObject(this);
         L.setGlobal("application");
-        // 插入 luaLpath
+
+        // 更安全地设置 package.path 和 cpath
         L.getGlobal("package");
-        L.push(luaLpath);
-        L.setField(-2, "path");
-        L.push(luaCpath);
-        L.setField(-2, "cpath");
-        L.pop(1);
+        if (L.isTable(-1)) {
+            L.push(luaLpath);
+            L.setField(-2, "path");
+
+            L.push(luaCpath);
+            L.setField(-2, "cpath");
+        } else {
+            // 错误情况输出日志并保护
+            System.err.println("[Lua] global 'package' is not a table!");
+        }
+        L.pop(1); // pop package 或 nil
     }
+
 
     // @formatter:off
     public Lua getLua() { return L; }

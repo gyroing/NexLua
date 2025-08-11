@@ -1,5 +1,5 @@
-local Toast = java.import("android.widget.Toast")
-local Button = java.import("android.widget.Button")
+local Toast = luajava.bindClass("android.widget.Toast")
+local Button = luajava.bindClass("android.widget.Button")
 local btn = Button(activity)
 
 btn.setText("Click me")

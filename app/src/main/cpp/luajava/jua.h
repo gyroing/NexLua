@@ -35,6 +35,14 @@ extern jmethodID juaapi_load;
 extern jmethodID juaapi_loadmodule;
 extern jmethodID juaapi_loadlib;
 extern jmethodID throwable_tostring;
+// LuaJava API Compatibility
+extern jmethodID juaapi_isinstanceof;
+extern jmethodID juaapi_getcontext;
+// extern jmethodID juaapi_override;
+extern jmethodID juaapi_createarray;
+extern jmethodID juaapi_astable;
+extern jmethodID juaapi_tostring;
+extern jmethodID juaapi_coding;
 
 int reopenAsGlobal(const char * file);
 

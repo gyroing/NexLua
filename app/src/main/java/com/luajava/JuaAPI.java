@@ -24,9 +24,12 @@ package com.luajava;
 
 
 
+import android.content.Context;
+
 import com.luajava.util.ClassUtils;
 import com.luajava.util.LRUCacheFactory;
 import com.luajava.value.LuaValue;
+import com.luajava.Lua.LuaType;
 
 import java.lang.reflect.*;
 import java.nio.ByteBuffer;
@@ -1123,4 +1126,73 @@ public abstract class JuaAPI {
                     return executable.getParameterTypes();
                 }
             };
+    // LuaJava API Compatibility
+    private static Context mApplicationContext;
+    public static void setContext(Context context) {
+        mApplicationContext = context.getApplicationContext();
+    }
+    public static int getContext(int stateIndex) {
+        Lua L = Jua.get(stateIndex);
+        if (mApplicationContext != null) {
+            L.pushJavaObject(mApplicationContext);
+            return 1;
+        }
+        return 0;
+    }
+
+    public static int toString(int stateIndex, Object obj) {
+        Lua L = Jua.get(stateIndex);
+        L.push(obj.toString());
+        return 1;
+    }
+
+    public static int isInstanceOf(int stateIndex, Object obj, Class<?> clazz) {
+        Lua L = Jua.get(stateIndex);
+        L.push(clazz != null && clazz.isInstance(obj));
+        return 1;
+    }
+
+    public static int coding(int stateIndex) {
+        Lua L = Jua.get(stateIndex);
+        try {
+            String str = L.type(1)==LuaType.STRING ? L.toString(1) : null;
+            String from = L.type(2)==LuaType.STRING ? L.toString(2) : "GBK";
+            String to = L.type(3)==LuaType.STRING ? L.toString(3) : "UTF-8";
+            if (str != null) {
+                byte[] bytes = str.getBytes(from);
+                String newStr = new String(bytes, to);
+                L.push(newStr);
+                return 1;
+            }
+        } catch (Exception e) {
+            return L.error(e);
+        }
+        return 0;
+    }
+
+    public static int createArray(int stateIndex, Class<?> clazz, int index) {
+        Lua L = Jua.get(stateIndex);
+        // 判断是否为 ArrayList / List, 是的话则转换成 List
+        if (clazz.isAssignableFrom(List.class)) {
+            L.pushJavaObject(L.toList(index));
+        } else if (clazz.isArray() && clazz.getComponentType() == Object.class) {
+            // 只匹配 Object[]
+            L.pushJavaArray(L.toList(index).toArray(new Object[0]));
+        } else if (clazz.isAssignableFrom(Map.class)) {
+            // 匹配 Map
+            L.pushJavaObject(L.toMap(index));
+        } else if (clazz.isInterface() && !clazz.isAnnotation()) {
+            // 批量转换 View.OnClickListener 等接口
+            L.pushValue(index);
+            L.pushJavaObject(L.createProxy(new Class[]{clazz}, Lua.Conversion.SEMI));
+        }
+        return 1;
+    }
+
+    public static int asTable(int stateIndex, Object obj) {
+        Lua L = Jua.get(stateIndex);
+        if (obj == null) return 0;
+        L.pushArray(obj);
+        return 1;
+    }
 }
