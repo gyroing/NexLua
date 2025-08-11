@@ -1,9 +1,13 @@
 package com.nexlua;
 
+import android.annotation.SuppressLint;
 import android.app.Application;
+import android.content.ClipData;
+import android.content.ClipDescription;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.preference.PreferenceManager;
 
 import com.luajava.JuaAPI;
@@ -29,7 +33,7 @@ public class LuaApplication extends Application implements LuaContext {
     }
 
     @Override
-    public void sendError(String error) {
+    public void sendError(String title, String error) {
     }
     
 
@@ -207,6 +211,49 @@ public class LuaApplication extends Application implements LuaContext {
         L.pop(1); // pop package 或 nil
     }
 
+    public static void setClipboardText(String text) {
+        setClipboardText("text", text);
+    }
+    @SuppressLint("ObsoleteSdkInt")
+    @SuppressWarnings("deprecation")
+    public static void setClipboardText(String label, String text) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            android.content.ClipboardManager clipboard =
+                    (android.content.ClipboardManager) mApplication.getSystemService(Context.CLIPBOARD_SERVICE);
+            ClipData clip = ClipData.newPlainText(label, text);
+            clipboard.setPrimaryClip(clip);
+        } else {
+            android.text.ClipboardManager clipboard =
+                    (android.text.ClipboardManager) mApplication.getSystemService(Context.CLIPBOARD_SERVICE);
+            clipboard.setText(text);
+        }
+    }
+
+    @SuppressLint("ObsoleteSdkInt")
+    @SuppressWarnings("deprecation")
+    public static String getClipboardText() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            android.content.ClipboardManager clipboard =
+                    (android.content.ClipboardManager) mApplication.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard.hasPrimaryClip()) {
+                ClipData clip = clipboard.getPrimaryClip();
+                if (clip != null && clip.getDescription().hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
+                    if (clip.getItemCount() > 0) {
+                        CharSequence text = clip.getItemAt(0).getText();
+                        if (text != null) return text.toString();
+                    }
+                }
+            }
+        } else {
+            android.text.ClipboardManager clipboard =
+                    (android.text.ClipboardManager) mApplication.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard.hasText()) {
+                CharSequence text = clipboard.getText();
+                if (text != null) return text.toString();
+            }
+        }
+        return null;
+    }
 
     // @formatter:off
     public Lua getLua() { return L; }

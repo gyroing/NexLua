@@ -9,31 +9,23 @@ public class Main extends LuaActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Intent intent = getIntent();
-        if (savedInstanceState==null) {
+        if (savedInstanceState == null) {
             if (intent.getData() != null)
                 runFunc("onNewIntent", getIntent());
-            if (intent.getBooleanExtra("isVersionChanged",false))
-                onVersionChanged(getIntent().getStringExtra("newVersionName"),getIntent().getStringExtra("oldVersionName"));
+            if (intent.getBooleanExtra("isVersionChanged", false))
+                onVersionChanged(getIntent().getStringExtra("newVersionName"), getIntent().getStringExtra("oldVersionName"));
         }
     }
 
     @Override
-    protected void onNewIntent(Intent intent)
-    {
+    protected void onNewIntent(Intent intent) {
         runFunc("onNewIntent", intent);
         super.onNewIntent(intent);
     }
 
     @Override
-    public String getLuaDir()
-    {
-        return getLocalDir();
-    }
-
-    @Override
-    public String getLuaPath()
-    {
-        return getLocalDir()+"/main.lua";
+    public String getLuaPath() {
+        return getLuaDir() + "/main.lua";
     }
 
     private void onVersionChanged(String newVersionName, String oldVersionName) {

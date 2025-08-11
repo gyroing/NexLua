@@ -24,5 +24,5 @@ public interface LuaContext {
     void setLuaExtDir(String dir);
     void setLuaDir(String dir);
     void sendMessage(String message);
-    void sendError(String error);
+    void sendError(String title, String error);
 }

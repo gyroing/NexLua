@@ -3,7 +3,7 @@ package com.nexlua;
 import android.Manifest;
 
 public final class LuaConfig {
-    public static final String APP_NAME = "lua"; // 软件名称
+    public static final String APP_NAME = "NexLua"; // 软件名称
     public static final String PACKAGE_NAME = "com.nexlua"; // 软件包名
     public static final String APP_VERSION = "1.0.0"; // 版本名
     public static final int APP_CODE = 1; // 版本号
