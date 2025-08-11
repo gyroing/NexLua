@@ -23,6 +23,15 @@ import java.util.Set;
 
 public class LuaApplication extends Application implements LuaContext {
 
+    @Override
+    public void sendMessage(String message) {
+    }
+
+    @Override
+    public void sendError(String error) {
+    }
+    
+
     private static LuaApplication mApplication;
     private static final HashMap<String, Object> data = new HashMap<>();
     private SharedPreferences mSharedPreferences;
@@ -178,6 +187,13 @@ public class LuaApplication extends Application implements LuaContext {
         // 插入全局 LuaApplication
         L.pushJavaObject(LuaApplication.this);
         L.setGlobal("application");
+        // 插入 luaLpath
+        L.getGlobal("package");
+        L.push(luaLpath);
+        L.setField(-2, "path");
+        L.push(luaCpath);
+        L.setField(-2, "cpath");
+        L.pop(1);
     }
 
     // @formatter:off

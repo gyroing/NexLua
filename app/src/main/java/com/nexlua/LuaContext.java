@@ -23,4 +23,6 @@ public interface LuaContext {
     Context getContext();
     void setLuaExtDir(String dir);
     void setLuaDir(String dir);
+    void sendMessage(String message);
+    void sendError(String error);
 }

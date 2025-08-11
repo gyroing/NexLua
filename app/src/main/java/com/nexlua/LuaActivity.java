@@ -59,15 +59,24 @@ import dalvik.system.DexClassLoader;
 
 public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnReceiveListener, LuaContext {
 
+    @Override
+    public void sendMessage(String message) {
+        adapter.add(message);
+        adapter.notifyDataSetChanged();
+    }
+
+    @Override
+    public void sendError(String error) {
+    }
+    
+
     private final static String ARG = "arg";
     private final static String DATA = "data";
     private final static String NAME = "name";
-    private static final ArrayList<String> prjCache = new ArrayList<>();
     private Handler handler;
     private TextView status;
     private LuaDexLoader mLuaDexLoader;
-    private int mWidth;
-    private int mHeight;
+    private int mWidth, mHeight;
     private ListView list;
     private ArrayAdapter<String> adapter;
     private final StringBuilder toastbuilder = new StringBuilder();
@@ -76,10 +85,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     private boolean isSetViewed;
     private long lastShow;
     private Menu optionsMenu;
-    private LuaValue mOnKeyDown;
-    private LuaValue mOnKeyUp;
-    private LuaValue mOnKeyLongPress;
-    private LuaValue mOnTouchEvent;
+    private LuaValue mOnKeyDown, mOnKeyUp, mOnKeyLongPress, mOnTouchEvent;
     private String localDir;
     private LuaBroadcastReceiver mReceiver;
     private boolean isUpdata;
@@ -118,6 +124,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         status.setTextIsSelectable(true);
         list = new ListView(this);
         list.setFastScrollEnabled(true);
+        list.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
         adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
@@ -151,7 +158,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
             luaFileName = new File(luaPath).getName();
             int idx = luaFileName.lastIndexOf(".");
             if (idx > 0) luaFileName = luaFileName.substring(0, idx);
-            // luaState.setLuaLpath = (luaDir + "/?.lua;" + luaDir + "/lua/?.lua;" + luaDir + "/?/init.lua;") + luaLpath;
             initializeLua();
             mLuaDexLoader = new LuaDexLoader(this);
             mLuaDexLoader.loadLibs();
@@ -210,47 +216,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         }
         return super.onKeyShortcut(keyCode, event);
     }
-
-    public void initMain() {
-        prjCache.add(getLocalDir());
-    }
-
-    public String getLuaPath() {
-        Intent intent = getIntent();
-        Uri uri = intent.getData();
-        if (uri == null)
-            return null;
-        String path = uri.getPath();
-        if (!new File(path).exists() && new File(getLuaPath(path)).exists())
-            path = getLuaPath(path);
-
-        luaPath = path;
-        File f = new File(path);
-
-        luaDir = new File(luaPath).getParent();
-        if (f.getName().equals("main.lua") && new File(luaDir, "init.lua").exists()) {
-            if (!prjCache.contains(luaDir))
-                prjCache.add(luaDir);
-        } else {
-            String parent = luaDir;
-            while (parent != null) {
-                if (prjCache.contains(parent)) {
-                    luaDir = parent;
-                    break;
-                } else {
-                    if (new File(parent, "main.lua").exists() && new File(parent, "init.lua").exists()) {
-                        luaDir = parent;
-                        if (!prjCache.contains(luaDir))
-                            prjCache.add(luaDir);
-                        break;
-                    }
-                }
-                parent = new File(parent).getParent();
-            }
-        }
-        return path;
-    }
-
 
     public String getLocalDir() {
         return localDir;
@@ -1103,7 +1068,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
     // @formatter:off
     public ArrayList<ClassLoader> getClassLoaders() { return mLuaDexLoader.getClassLoaders(); }
-    // public String getLuaPath() { return luaPath; }
+    public String getLuaPath() { return luaPath; }
     public String getLuaPath(String path) { return new File(getLuaDir(), path).getAbsolutePath(); }
     public String getLuaPath(String dir, String name) { return new File(getLuaDir(dir), name).getAbsolutePath(); }
     // @formatter:on
@@ -1130,6 +1095,13 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         // 插入全局 LuaApplication
         L.pushJavaObject(app);
         L.setGlobal("application");
+        // 插入 luaLpath
+        L.getGlobal("package");
+        L.push(luaLpath);
+        L.setField(-2, "path");
+        L.push(luaCpath);
+        L.setField(-2, "cpath");
+        L.pop(1);
     }
 
     // @formatter:off

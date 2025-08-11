@@ -16,14 +16,18 @@ public class LuaPrint implements JFunction {
     }
     @Override
     public int __call(Lua L) throws LuaException {
-        for (int i = 1; i <= L.getTop(); i++) {
-            String val = L.toString(i);
-            output.append("\t");
-            output.append(val);
-            output.append("\t");
+        int top=L.getTop();
+        if (top>0) {
+            output.append(L.toString(1));
+            for (int i = 2; i <= top; i++) {
+                output.append("\t");
+                output.append(L.toString(i));
+            }
+            mLuaContext.sendMessage(output.toString());
+            output.setLength(0);
+        } else {
+            mLuaContext.sendMessage("");
         }
-        Toast.makeText(mLuaContext.getContext(), output.toString().substring(1, output.length() - 1), Toast.LENGTH_SHORT).show();
-        output.setLength(0);
         return 0;
     }
 }
