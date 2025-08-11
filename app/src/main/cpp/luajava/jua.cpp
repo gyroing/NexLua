@@ -293,6 +293,7 @@ void initMetaRegistry(lua_State * L) {
   }
   lua_pop(L, 1);
   luaJ_overloadrequire(L);
+  luaJ_initproxycache(L);
 }
 
 int getMainThreadId(lua_State * L) {

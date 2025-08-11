@@ -51,6 +51,38 @@ void luaJ_overloadrequire(lua_State *L) {
     }
 }
 
+void luaJ_initproxycache(lua_State *L) {
+    lua_newtable(L);
+    lua_newtable(L);
+    lua_pushstring(L, "k");
+    lua_setfield(L, -2, "__mode");
+    lua_setmetatable(L, -2);
+    lua_setfield(L, LUA_REGISTRYINDEX, "__jproxy_cache");
+}
+
+int jua_cachedProxy(lua_State *L) {
+    luaL_checktype(L, 1, LUA_TFUNCTION);
+    lua_getfield(L, LUA_REGISTRYINDEX, "__jproxy_cache");
+    lua_pushvalue(L, 1);
+    lua_gettable(L, -2);
+    if (!lua_isnil(L, -1)) {
+        lua_remove(L, -2);
+        return 1;
+    }
+    lua_pop(L, 1);
+    JNIEnv * env = getJNIEnv(L);
+    int stateIndex = getStateIndex(L);
+    int result = env->CallStaticIntMethod(juaapi_class, juaapi_proxy, (jint) stateIndex);
+    if (checkOrError(env, L, result) != 1) {
+        return luaL_error(L, "Failed to create java proxy object");
+    }
+    lua_pushvalue(L, 1);
+    lua_pushvalue(L, -2);
+    lua_settable(L, -4);
+    lua_remove(L, -2);
+    return 1;
+}
+
 inline int jInvokeObject(lua_State * L, jmethodID methodID,
                          jobject data, const char * name, int params) {
     JNIEnv * env = getJNIEnv(L);

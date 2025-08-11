@@ -36,6 +36,7 @@ static int pushJ(lua_State * L, jobject obj) {
     if (e != NULL)
 
 void luaJ_overloadrequire(lua_State * L);
+void luaJ_initproxycache(lua_State *L);
 
 int jclassIndex(lua_State * L);
 int jclassNewIndex(lua_State * L);
