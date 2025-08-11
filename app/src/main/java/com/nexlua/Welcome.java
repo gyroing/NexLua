@@ -9,14 +9,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.TextView;
+import android.widget.Toast;
 import java.io.IOException;
 
 
 public class Welcome extends Activity {
-    private LuaApplication app;
     public static String oldVersionName, newVersionName;
     public static long oldUpdateTime, newUpdateTime;
-    public static boolean isVersionChanged;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -26,24 +25,9 @@ public class Welcome extends Activity {
         view.setTextColor(0xff888888);
         view.setGravity(Gravity.TOP);
         setContentView(view);
-        if (Build.VERSION.SDK_INT >= 23) requestPermissions(LuaConfig.REQUIRED_PERMISSIONS, 0);
-        if (shouldUpdate()) {
-            AssetExtractor.extractAssets(this, new AssetExtractor.ExtractCallback(){
-                    @Override
-                    public void onStart() {
-                    }
-                    @Override
-                    public void onSuccess() {
-                        startActivity();
-                    }
-                    @Override
-                    public void onError(IOException e) {
-                    }
-                
-            });
-        } else {
-            startActivity();
-        }
+        if (LuaConfig.REQUEST_PERMISSIONS && Build.VERSION.SDK_INT >= 23)
+            requestPermissions(LuaConfig.REQUIRED_PERMISSIONS, 0);
+        startActivity(shouldUpdate());
     }
 
     @Override
@@ -51,15 +35,28 @@ public class Welcome extends Activity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
-    public void startActivity() {
+    public void startActivity(boolean isVersionChanged) {
         Intent intent = new Intent(Welcome.this, Main.class);
         if (isVersionChanged) {
-            intent.putExtra("isVersionChanged", isVersionChanged);
+            intent.putExtra("isVersionChanged", true);
             intent.putExtra("newVersionName", newVersionName);
             intent.putExtra("oldVersionName", oldVersionName);
+            AssetExtractor.extractAssets(this, new AssetExtractor.ExtractCallback(){
+                @Override
+                public void onStart() {
+                }
+                @Override
+                public void onSuccess() {
+                    startActivity(intent);
+                    finish();
+                }
+                @Override
+                public void onError(IOException e) {
+                }
+
+            });
         }
         startActivity(intent);
-        // overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out                                                                                                                 );
         finish();
     }
 
@@ -87,7 +84,7 @@ public class Welcome extends Activity {
             }
             return false;
         } catch (PackageManager.NameNotFoundException e) {
-            e.printStackTrace();
+            Toast.makeText(this, "package is null", Toast.LENGTH_SHORT).show();
             return true;
         }
     }
