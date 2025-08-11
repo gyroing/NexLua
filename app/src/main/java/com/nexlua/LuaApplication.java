@@ -3,16 +3,18 @@ package com.nexlua;
 import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.Environment;
+import android.content.res.Configuration;
 import android.preference.PreferenceManager;
-import android.widget.Toast;
 
 import com.luajava.Lua;
-import com.luajava.NotNull;
+import com.luajava.Lua.LuaType;
+import com.luajava.luajit.LuaJit;
 import com.luajava.value.LuaTableValue;
 import com.luajava.value.LuaValue;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,111 +24,72 @@ import java.util.Set;
 public class LuaApplication extends Application implements LuaContext {
 
     private static LuaApplication mApplication;
-    private static final HashMap<String, Object> data = new HashMap<String, Object>();
-    protected String luaDir;
-    protected String luaExtDir;
-    protected String odexDir;
-    protected String libDir;
-    protected String luaLibDir;
-    protected String luaCpath;
-    protected String luaLpath;
+    private static final HashMap<String, Object> data = new HashMap<>();
     private SharedPreferences mSharedPreferences;
-
-    public static LuaApplication getInstance() {
-        return mApplication;
-    }
-
-    @Override
-    public ArrayList<ClassLoader> getClassLoaders() {
-        return null;
-    }
-
-    @Override
-    public String getLuaDir(@NotNull String dir) {
-        return new File(getLuaDir(), dir).getAbsolutePath();
-    }
-
-    @Override
-    public String getLuaDir() {
-        return luaDir;
-    }
-
-    @Override
-    public String getLuaPath() {
-        return luaDir;
-    }
-
-    @Override
-    public String getLuaPath(String path) {
-        return new File(getLuaDir(), path).getAbsolutePath();
-    }
-
-    @Override
-    public String getLuaPath(String dir, String name) {
-        return new File(getLuaDir(dir), name).getAbsolutePath();
-    }
-
-    @Override
-    public String getLuaExtPath(String path) {
-        return new File(getLuaExtDir(), path).getAbsolutePath();
-    }
-
-    @Override
-    public String getLuaExtPath(String dir, String name) {
-        return new File(getLuaExtDir(dir), name).getAbsolutePath();
-    }
-
-
-    @Override
-    public String getLuaExtDir(String name) {
-        File dir = new File(getLuaExtDir(), name);
-        if (!dir.exists())
-            if (!dir.mkdirs())
-                return dir.getAbsolutePath();
-        return dir.getAbsolutePath();
-    }
-
-    public String getLibDir() {
-        return libDir;
-    }
-
-    public String getOdexDir() {
-        return odexDir;
-    }
+    private String luaDir, luaExtDir, odexDir, libDir, luaLibDir, luaCpath, luaLpath, luaPath;
+    private Lua L;
 
     @Override
     public void onCreate() {
         super.onCreate();
         mApplication = this;
         mSharedPreferences = getSharedPreferences(this);
-        // 初始化AndroLua工作目录
-        if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
-            String sdDir = Environment.getExternalStorageDirectory().getAbsolutePath();
-            luaExtDir = sdDir + "/AndroLua";
-        } else {
-            File[] fs = new File("/storage").listFiles();
-            for (File f : fs) {
-                String[] ls = f.list();
-                if (ls == null)
-                    continue;
-                if (ls.length > 5)
-                    luaExtDir = f.getAbsolutePath() + "/AndroLua";
+        initializeLua();
+        initializeLuaEvent();
+        luaPath = getLuaPath("app.lua");
+        if (new File(luaPath).exists()) {
+            L.openLibraries();
+            try {
+                L.load(ByteBuffer.wrap(LuaUtil.readAll(luaPath)), luaPath);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            if (luaExtDir == null)
-                luaExtDir = getDir("AndroLua", Context.MODE_PRIVATE).getAbsolutePath();
         }
+        if (mOnCreate != null) mOnCreate.call();
+    }
 
-        File destDir = new File(luaExtDir);
-        if (!destDir.exists())
-            destDir.mkdirs();
-        // NexLua 文件夹
-        luaDir = getFilesDir().getAbsolutePath();
-        odexDir = getDir("odex", Context.MODE_PRIVATE).getAbsolutePath();
-        libDir = getDir("lib", Context.MODE_PRIVATE).getAbsolutePath();
-        luaLibDir = getDir("lua", Context.MODE_PRIVATE).getAbsolutePath();
-        luaCpath = getApplicationInfo().nativeLibraryDir + "/lib?.so" + ";" + libDir + "/lib?.so";
-        //luaDir = extDir;
-        luaLpath = luaLibDir + "/?.lua;" + luaLibDir + "/lua/?.lua;" + luaLibDir + "/?/init.lua;";
+    private LuaValue mOnCreate, mOnTerminate, mOnLowMemory, mOnTrimMemory, mOnConfigurationChanged;
+
+    private void initializeLuaEvent() {
+        LuaValue val;
+        val = L.get("onCreate");
+        mOnCreate = (val.type() == LuaType.FUNCTION) ? val : null;
+        val = L.get("onTerminate");
+        mOnTerminate = (val.type() == LuaType.FUNCTION) ? val : null;
+        val = L.get("onLowMemory");
+        mOnLowMemory = (val.type() == LuaType.FUNCTION) ? val : null;
+        val = L.get("onTrimMemory");
+        mOnTrimMemory = (val.type() == LuaType.FUNCTION) ? val : null;
+        val = L.get("onConfigurationChanged");
+        mOnConfigurationChanged = (val.type() == LuaType.FUNCTION) ? val : null;
+    }
+
+    @Override
+    public void onTerminate() {
+        super.onTerminate();
+        if (mOnTerminate != null) mOnTerminate.call();
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (mOnLowMemory != null) mOnLowMemory.call();
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (mOnTrimMemory != null) mOnTrimMemory.call(level);
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (mOnConfigurationChanged != null) mOnConfigurationChanged.call(newConfig);
+    }
+
+    public static LuaApplication getInstance() {
+        return mApplication;
     }
 
     private static SharedPreferences getSharedPreferences(Context context) {
@@ -141,31 +104,18 @@ public class LuaApplication extends Application implements LuaContext {
         return PreferenceManager.getDefaultSharedPreferences(context);
     }
 
-    @Override
-    public void call(String name, Object[] args) {
-    }
-
-    @Override
-    public void set(String name, Object object) {
-        data.put(name, object);
-    }
-
-    @Override
     public HashMap<String, Object> getGlobalData() {
         return data;
     }
 
-    @Override
     public Object getSharedData() {
         return mSharedPreferences.getAll();
     }
 
-    @Override
     public Object getSharedData(String key) {
         return mSharedPreferences.getAll().get(key);
     }
 
-    @Override
     public Object getSharedData(String key, Object def) {
         Object ret = mSharedPreferences.getAll().get(key);
         if (ret == null)
@@ -173,7 +123,6 @@ public class LuaApplication extends Application implements LuaContext {
         return ret;
     }
 
-    @Override
     public boolean setSharedData(String key, Object value) {
         SharedPreferences.Editor edit = mSharedPreferences.edit();
         if (value == null)
@@ -210,69 +159,44 @@ public class LuaApplication extends Application implements LuaContext {
         return data.get(name);
     }
 
-    public String getLuaLibDir() {
-        return luaLibDir;
+    // @formatter:off
+    public ArrayList<ClassLoader> getClassLoaders() { return null; }
+    public String getLuaPath() { return luaPath; }
+    public String getLuaPath(String path) { return new File(getLuaDir(), path).getAbsolutePath(); }
+    public String getLuaPath(String dir, String name) { return new File(getLuaDir(dir), name).getAbsolutePath(); }
+    // @formatter:on
+    public void initializeLua() {
+        luaDir = getFilesDir().getAbsolutePath();
+        odexDir = getDir("odex", Context.MODE_PRIVATE).getAbsolutePath();
+        libDir = getDir("lib", Context.MODE_PRIVATE).getAbsolutePath();
+        luaLibDir = getDir("lua", Context.MODE_PRIVATE).getAbsolutePath();
+        luaCpath = getApplicationInfo().nativeLibraryDir + "/lib?.so" + ";" + libDir + "/lib?.so";
+        luaLpath = luaLibDir + "/?.lua;" + luaLibDir + "/lua/?.lua;" + luaLibDir + "/?/init.lua;";
+        L = new LuaJit();
+        for (String libraryName : new String[]{"package", "string", "table", "math", "io", "os", "debug"})
+            L.openLibrary(libraryName);
+        // 插入全局 LuaApplication
+        L.pushJavaObject(LuaApplication.this);
+        L.setGlobal("application");
     }
 
-    @Override
-    public String getLuaExtDir() {
-        return luaExtDir;
-    }
-
-    @Override
-    public void setLuaExtDir(String dir) {
-        if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
-            String sdDir = Environment.getExternalStorageDirectory().getAbsolutePath();
-            luaExtDir = new File(sdDir, dir).getAbsolutePath();
-        } else {
-            File[] fs = new File("/storage").listFiles();
-            for (File f : fs) {
-                String[] ls = f.list();
-                if (ls == null)
-                    continue;
-                if (ls.length > 5)
-                    luaExtDir = new File(f, dir).getAbsolutePath();
-            }
-            if (luaExtDir == null)
-                luaExtDir = getDir(dir, Context.MODE_PRIVATE).getAbsolutePath();
-        }
-    }
-
-    @Override
-    public String getLuaLpath() {
-        return luaLpath;
-    }
-
-    @Override
-    public String getLuaCpath() {
-        return luaCpath;
-    }
-
-    @Override
-    public Context getContext() {
-        return this;
-    }
-
-    @Override
-    public Lua getLua() {
-        return null;
-    }
-
-    @Override
-    public Object doFile(String path, Object[] arg) {
-        return null;
-    }
-
-    @Override
-    public void sendMsg(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-
-    }
-
-    @Override
-    public void sendError(String title, Exception msg) {
-
-    }
+    // @formatter:off
+    public Lua getLua() { return L; }
+    public String getLuaDir() { return luaDir; }
+    public String getLuaDir(String dir) { return new File(getLuaDir(), dir).getAbsolutePath(); }
+    public String getLuaExtDir() { return luaExtDir; }
+    public String getLuaExtDir(String dir) { return new File(luaExtDir, dir).getAbsolutePath(); }
+    public String getLuaExtPath(String path) { return new File(getLuaExtDir(), path).getAbsolutePath(); }
+    public String getLuaExtPath(String dir, String name) { return new File(getLuaExtDir(dir), name).getAbsolutePath(); }
+    public String getOdexDir() { return odexDir; }
+    public String getLibDir() { return libDir; }
+    public String getLuaLibDir() { return luaLibDir; }
+    public String getLuaLpath() { return luaLpath; }
+    public String getLuaCpath() { return luaCpath; }
+    public Context getContext() { return this; }
+    public void setLuaExtDir(String dir) { luaExtDir =  dir; }
+    public void setLuaDir(String dir) { luaDir = dir; }
+    // @formatter:on
 }
 
 

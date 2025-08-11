@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Objects;
+import java.io.IOException;
 
 /**
  * An {@link ExternalLoader} that loads modules from classpath
@@ -59,10 +60,11 @@ public class ClassPathLoader implements ExternalLoader {
 
     @Override
     public @Nullable Buffer load(String module, Lua ignored) {
-        try (InputStream resource = Objects.requireNonNull(
-                // We use the class loader to load resources support loading from other Java modules.
+        InputStream resource = null;
+        try {
+            resource = Objects.requireNonNull(
                 classLoader.getResourceAsStream(getPath(module))
-        )) {
+            );
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             byte[] bytes = new byte[4096];
             int i;
@@ -78,6 +80,14 @@ public class ClassPathLoader implements ExternalLoader {
             return buffer;
         } catch (Exception e) {
             return null;
+        } finally {
+            if (resource != null) {
+                try {
+                    resource.close();
+                } catch (IOException e) {
+                    // Ignore close exception
+                }
+            }
         }
     }
 
@@ -105,7 +115,7 @@ public class ClassPathLoader implements ExternalLoader {
         }
 
         @Override
-        public void write(byte @NotNull [] bytes, int off, int len) {
+        public void write(byte[] bytes, int off, int len) {
             buffer.put(bytes, off, len);
         }
     }

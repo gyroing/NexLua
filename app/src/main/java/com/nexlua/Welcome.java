@@ -66,8 +66,8 @@ public class Welcome extends Activity {
         view.setGravity(Gravity.TOP);
         setContentView(view);
         app = (LuaApplication) getApplication();
-        luaMdDir = app.luaLibDir;
-        localDir = app.luaDir;
+        luaMdDir = app.getLuaLibDir();
+        localDir = app.getLuaDir();
         if (checkInfo()) {
             if (Build.VERSION.SDK_INT >= 23) {
                 Lua lua = null;

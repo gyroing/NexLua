@@ -131,7 +131,7 @@ public abstract class JuaAPI {
         AbstractLua L = Jua.get(id);
         try {
             Class<?> clazz = ClassUtils.forName(className);
-            Method method = clazz.getDeclaredMethod(methodName, Lua.class);
+            final Method method = clazz.getDeclaredMethod(methodName, Lua.class);
             if (method.getReturnType() == int.class) {
                 //noinspection Convert2Lambda
                 L.push(new JFunction() {

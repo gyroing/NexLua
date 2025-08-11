@@ -1,10 +1,11 @@
 package com.luajava.util;
 
-
-
 import com.luajava.Nullable;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * An LRU-cache based on {@link LinkedHashMap}
@@ -23,6 +24,7 @@ public final class LRUCache<K1, K2, V> {
         this.innerSize = level2Size;
         ArrayList<Map<K1, Map<K2, V>>> shardList = new ArrayList<>(shards);
         for (int i = 0; i < shards; i++) {
+            // shardList.add(Collections.synchronizedMap((Map<K1, Map<K2, V>>) new Cache<>(level1Size)));
             shardList.add(Collections.synchronizedMap(new Cache<>(level1Size)));
         }
         this.cacheShards = Collections.unmodifiableList(shardList);

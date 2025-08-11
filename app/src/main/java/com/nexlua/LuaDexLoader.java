@@ -17,9 +17,9 @@ import java.util.HashMap;
 import dalvik.system.DexClassLoader;
 
 public class LuaDexLoader {
-    private static HashMap<String, LuaDexClassLoader> dexCache = new HashMap<String, LuaDexClassLoader>();
-    private ArrayList<ClassLoader> dexList = new ArrayList<ClassLoader>();
-    private HashMap<String, String> libCache = new HashMap<String, String>();
+    private static HashMap<String, LuaDexClassLoader> dexCache = new HashMap<>();
+    private ArrayList<ClassLoader> dexList = new ArrayList<>();
+    private HashMap<String, String> libCache = new HashMap<>();
 
     private LuaContext mContext;
 

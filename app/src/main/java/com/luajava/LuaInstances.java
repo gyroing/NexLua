@@ -63,7 +63,7 @@ public class LuaInstances<T> {
     }
 
     protected synchronized Token<T> add() {
-        int id = addNullable(null);
+        final int id = addNullable(null);
         //noinspection Convert2Lambda
         return new Token<>(id, new Token.Consumer<T>() {
             @Override

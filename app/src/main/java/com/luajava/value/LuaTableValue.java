@@ -119,7 +119,7 @@ public class LuaTableValue extends AbstractRefLuaValue implements LuaValue {
         @NotNull
         @Override
         public Iterator<Entry<LuaValue, LuaValue>> iterator() {
-            Lua L = state();
+            final Lua L = state();
             return new Iterator<Entry<LuaValue, LuaValue>>() {
                 LuaValue keyRef = L.fromNull();
 

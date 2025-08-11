@@ -28,6 +28,7 @@ import com.luajava.NotNull;
 
 import java.util.AbstractMap;
 import java.util.Objects;
+import java.util.Map.Entry;
 import java.util.Set;
 
 /**
@@ -68,7 +69,7 @@ public abstract class AbstractLuaValue<T extends Lua>
 
     @NotNull
     @Override
-    public Set<Entry<LuaValue, LuaValue>> entrySet() {
+    public Set<java.util.Map.Entry<LuaValue, LuaValue>> entrySet() {
         throw new UnsupportedOperationException(type.toString());
     }
 

@@ -1,57 +1,26 @@
 package com.nexlua;
 
-import android.content.*;
 
+import android.content.Context;
 import com.luajava.Lua;
-
-import java.util.*;
+import java.util.ArrayList;
 
 public interface LuaContext {
-
-    public ArrayList<ClassLoader> getClassLoaders();
-
-    public void call(String func, Object... args);
-
-    public void set(String name, Object value);
-
-    public Lua getLua();
-
-    public String getLuaPath();
-
-    public String getLuaPath(String path);
-
-    public String getLuaPath(String dir, String name);
-
-    public String getLuaDir();
-
-    public String getLuaDir(String dir);
-
-    public String getLuaExtDir();
-
-    public String getLuaExtDir(String dir);
-
-    public void setLuaExtDir(String dir);
-
-    public String getLuaExtPath(String path);
-
-    public String getLuaExtPath(String dir, String name);
-
-    public String getLuaLpath();
-
-    public String getLuaCpath();
-
-    public Context getContext();
-
-    public Object doFile(String path, Object... arg);
-
-    public void sendMsg(String msg);
-
-    public void sendError(String title, Exception msg);
-
-    public HashMap<String, Object> getGlobalData();
-
-    public Object getSharedData();
-    public Object getSharedData(String key);
-    public Object getSharedData(String key,Object def);
-    public boolean setSharedData(String key, Object value);
+    // NexLua Environment
+    ArrayList<ClassLoader> getClassLoaders();
+    Lua getLua();
+    String getLuaDir();
+    String getLuaDir(String dir);
+    String getLuaExtDir();
+    String getLuaExtDir(String dir);
+    String getLuaExtPath(String path);
+    String getLuaExtPath(String dir, String name);
+    String getOdexDir();
+    String getLibDir();
+    String getLuaLibDir();
+    String getLuaLpath();
+    String getLuaCpath();
+    Context getContext();
+    void setLuaExtDir(String dir);
+    void setLuaDir(String dir);
 }

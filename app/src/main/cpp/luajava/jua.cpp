@@ -4,7 +4,8 @@
 #include "jua.h"
 #include "juaapi.h"
 
-#include <stdlib.h>
+#include <cstdlib>
+#include "lua.h"
 
 #include "mobile-nosys.h"
 #if LJ_TARGET_DLOPEN

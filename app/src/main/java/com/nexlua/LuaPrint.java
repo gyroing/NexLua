@@ -1,5 +1,8 @@
 package com.nexlua;
 
+import android.content.Context;
+import android.widget.Toast;
+
 import com.luajava.Lua;
 import com.luajava.JFunction;
 import com.luajava.LuaException;
@@ -13,17 +16,13 @@ public class LuaPrint implements JFunction {
     }
     @Override
     public int __call(Lua L) throws LuaException {
-        if (L.getTop() < 2) {
-            mLuaContext.sendMsg("");
-            return 0;
-        }
-        for (int i = 2; i <= L.getTop(); i++) {
+        for (int i = 1; i <= L.getTop(); i++) {
             String val = L.toString(i);
             output.append("\t");
             output.append(val);
             output.append("\t");
         }
-        mLuaContext.sendMsg(output.toString().substring(1, output.length() - 1));
+        Toast.makeText(mLuaContext.getContext(), output.toString().substring(1, output.length() - 1), Toast.LENGTH_SHORT).show();
         output.setLength(0);
         return 0;
     }
