@@ -54,7 +54,7 @@
     <application
         android:name="com.nexlua.LuaApplication"
         android:icon="@drawable/icon"
-        android:label="AndroLua+"
+        android:label="NexLua"
         android:largeHeap="true"
         android:persistent="true"
         android:resizeableActivity="true"
@@ -62,8 +62,6 @@
         tools:targetApi="n">
         <activity
             android:name="com.nexlua.Welcome"
-            android:label="AndroLua+"
-            android:screenOrientation="portrait"
             android:theme="@style/WelcomeTheme"
             android:exported="true">
             <intent-filter>
