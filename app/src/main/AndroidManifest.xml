@@ -62,7 +62,7 @@
         tools:targetApi="n">
         <activity
             android:name="com.nexlua.Welcome"
-            android:theme="@style/WelcomeTheme"
+            android:theme="@style/AppTheme"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -73,5 +73,9 @@
         <activity
             android:name="com.nexlua.Main"
             android:exported="true" />
+        <activity
+            android:name="com.nexlua.CrashActivity"
+            android:process=":crash"
+            android:theme="@style/AppTheme" />
     </application>
 </manifest>

@@ -106,7 +106,11 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         setTitle(LuaConfig.APP_NAME);
         setTheme(LuaConfig.APP_THEME);
         // 执行 Lua
-        loadLua();
+        try {
+            loadLua();
+        } catch (Exception e) {
+            sendError(e);
+        }
         // 绑定事件
         // onCreate
         mOnCreate = getNullableValue("onCreate");
@@ -142,11 +146,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public void loadLua() {
-        try {
-            doAsset("main.lua", null);
-        } catch (Exception e) {
-            sendError(e.getClass().getSimpleName(), e.getMessage());
-        }
+        doAssets("main.lua", null);
     }
 
     private LuaValue getNullableValue(String name) {
@@ -224,8 +224,12 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
 
     private boolean onLuaEvent(LuaValue event, Object... args) {
         if (event != null) {
-            LuaValue[] ret = event.call(args);
-            return ret != null && ret.length > 0 && ret[0].toBoolean();
+            try {
+                LuaValue[] ret = event.call(args);
+                return ret != null && ret.length > 0 && ret[0].toBoolean();
+            } catch (LuaException e) {
+                sendError(e);
+            }
         }
         return false;
     }
@@ -511,9 +515,13 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         return L.toObject(-1);
     }
 
-    public Object doAsset(String name, Object[] args) throws IOException {
-        L.run(new String(LuaUtil.readAsset(this, name)));
-        return L.toObject(-1);
+    public Object doAssets(String name, Object[] args) {
+        try {
+            L.run(new String(LuaUtil.readAsset(this, name)));
+            return L.toObject(-1);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     //运行lua函数
@@ -585,18 +593,33 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
 
     @Override
     public void sendError(String title, String message) {
-        boolean ret = onLuaEvent(mOnError, message);
-        if (!ret) {
-            setTitle(title);
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    adapter.add(message);
-                    adapter.notifyDataSetChanged();
-                }
-            });
+        if (!isViewInflated) {
+            setConsoleLayout();
+            ActionBar actionBar = getActionBar();
+            if (actionBar != null) actionBar.setDisplayHomeAsUpEnabled(true);
+            boolean ret = onLuaEvent(mOnError, message);
+            if (!ret) {
+                setTitle(title);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        adapter.add(message);
+                        adapter.notifyDataSetChanged();
+                    }
+                });
+            }
         }
     }
+
+    public void sendError(Exception e) {
+        if (e instanceof LuaException) {
+            LuaException luaException = (LuaException) e;
+            sendError(luaException.getType(), luaException.getMessage());
+        } else {
+            sendError(e.getClass().getSimpleName(), e.getMessage());
+        }
+    }
+
     // @formatter:off
     public ArrayList<ClassLoader> getClassLoaders() { return mLuaDexLoader.getClassLoaders(); }
     public String getLuaPath() { /* return luaPath */ return null; }

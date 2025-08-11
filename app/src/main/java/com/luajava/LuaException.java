@@ -38,6 +38,32 @@ public class LuaException extends RuntimeException {
         return type + ": " + super.toString();
     }
 
+    public final String getType() {
+        switch (type) {
+            case FILE:
+                return "IO Error";
+            case GC:
+                return "GC Error";
+            case HANDLER:
+                return "Handler Error";
+            case MEMORY:
+                return "Memory Error";
+            case OK:
+                return "No Error";
+            case RUNTIME:
+                return "Runtime Error";
+            case SYNTAX:
+                return "Syntax Error";
+            case YIELD:
+                return "Thread Error";
+            case UNKNOWN:
+                return "Unknown Error";
+            case JAVA:
+                return "Java Error";
+        }
+        return "Unknown Error";
+    }
+
     /**
      * Lua-relevant error types.
      *

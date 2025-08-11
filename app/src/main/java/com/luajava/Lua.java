@@ -268,6 +268,8 @@ public interface Lua extends AutoCloseable, LuaThread {
     @Nullable
     String toString(int index);
 
+    @Nullable String ltoString(int index);
+
     /**
      * Creates a {@link java.nio.ByteBuffer} from the string at the specific index
      *

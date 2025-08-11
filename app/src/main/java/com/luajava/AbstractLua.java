@@ -379,6 +379,18 @@ public abstract class AbstractLua implements Lua {
     }
 
     @Override
+    public @Nullable String ltoString(int index) {
+        try {
+            getGlobal("tostring");
+            pushValue(index);
+            pCall(1, 1);
+            return toString(-1);
+        } finally {
+            pop(1);
+        }
+    }
+
+    @Override
     public @Nullable ByteBuffer toBuffer(int index) {
         return (ByteBuffer) C.luaJ_tobuffer(L, index);
     }

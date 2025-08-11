@@ -18,10 +18,10 @@ public class LuaPrint implements JFunction {
     public int __call(Lua L) throws LuaException {
         int top=L.getTop();
         if (top>0) {
-            output.append(L.toString(1));
+            output.append(L.ltoString(1));
             for (int i = 2; i <= top; i++) {
                 output.append("\t");
-                output.append(L.toString(i));
+                output.append(L.ltoString(i));
             }
             mLuaContext.sendMessage(output.toString());
             output.setLength(0);

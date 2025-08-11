@@ -150,6 +150,21 @@ static int javaLoadlib(lua_State *L) {
 }
 
 // Luajava API Compatibility
+static int javaNewInstance(lua_State *L) {
+    const char *className = luaL_checkstring(L, 1);
+    JNIEnv *env = getJNIEnv(L);
+    int stateIndex = getStateIndex(L);
+    jstring str = env->NewStringUTF(className);
+    int ret = env->CallStaticIntMethod(juaapi_class, juaapi_import, (jint) stateIndex,
+                                       str);
+    env->DeleteLocalRef(str);
+    if (checkOrError(env, L, ret) != 1) {
+        return luaL_error(L, "class not found: %s", className);
+    }
+    lua_replace(L, 1);
+    return jclassCall(L);
+}
+
 static int javaIsInstanceOf(lua_State *L) {
     luaL_checkudata(L, 1, JAVA_OBJECT_META_REGISTRY);
     luaL_checkudata(L, 2, JAVA_CLASS_META_REGISTRY);
@@ -236,7 +251,7 @@ const luaL_Reg javalib[] = {
         // Luajava API Compatibility
         {"bindClass",   javaImport},
         // {"new",         javaNew},
-        {"newInstance", javaNew},
+        {"newInstance", javaNewInstance},
         {"loadLib",     javaLoadlib},
         {"createProxy", javaProxy},
         {"newArray",    javaArray},
