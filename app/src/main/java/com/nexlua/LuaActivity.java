@@ -4,7 +4,6 @@ import android.annotation.SuppressLint;
 import android.app.ActionBar;
 import android.app.Activity;
 import android.app.ActivityManager;
-import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -13,15 +12,10 @@ import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
-import android.graphics.Color;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.StrictMode;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.ContextMenu;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -33,13 +27,11 @@ import android.view.ViewGroup.LayoutParams;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.luajava.JFunction;
 import com.luajava.Lua;
 import com.luajava.Lua.LuaType;
 import com.luajava.LuaException;
@@ -48,7 +40,6 @@ import com.luajava.luajit.LuaJit;
 import com.luajava.value.LuaValue;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -62,7 +53,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     private LuaValue mOnKeyDown, mOnKeyUp, mOnKeyLongPress, mOnKeyShortcut, mOnTouchEvent, mOnAccessibilityEvent;
     private LuaValue mOnCreateOptionsMenu, mOnCreateContextMenu, mOnOptionsItemSelected, mOnMenuItemSelected, mOnContextItemSelected;
     private LuaValue mOnActivityResult, onRequestPermissionsResult;
-    private LuaValue mOnConfigurationChanged, mOnCreate, mOnError, mOnReceive;
+    private LuaValue mOnConfigurationChanged, mOnCreate, mOnError, mOnReceive, mOnNewIntent;
     private LuaBroadcastReceiver mReceiver;
     private LuaResources mResources;
     private String luaDir, luaExtDir, odexDir, libDir, luaLibDir, luaCpath, luaLpath;
@@ -81,7 +72,8 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // 设置主题
-        setTheme(R.style.AppTheme);
+        setTitle(LuaConfig.APP_NAME);
+        setTheme(LuaConfig.APP_THEME);
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
         super.onCreate(null);
@@ -103,46 +95,57 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         initializeLua();
         mLuaDexLoader = new LuaDexLoader(this);
         mLuaDexLoader.loadLibs();
-        setTitle(LuaConfig.APP_NAME);
-        setTheme(LuaConfig.APP_THEME);
         // 执行 Lua
         try {
             loadLua();
+            // onCreate
+            mOnCreate = getNullableValue("onCreate");
+            // onKeyEvent
+            mOnKeyShortcut = getNullableValue("onKeyShortcut");
+            mOnKeyDown = getNullableValue("onKeyDown");
+            mOnKeyUp = getNullableValue("onKeyUp");
+            mOnKeyLongPress = getNullableValue("onKeyLongPress");
+            // onTouchEvent
+            mOnTouchEvent = getNullableValue("onTouchEvent");
+            // onAccessibilityEvent
+            mOnAccessibilityEvent = getNullableValue("onAccessibilityEvent");
+            // onCreateOptionsMenu
+            mOnCreateOptionsMenu = getNullableValue("onCreateOptionsMenu");
+            // mOnCreateContextMenu
+            mOnCreateContextMenu = getNullableValue("onCreateContextMenu");
+            // onOptionsItemSelected
+            mOnOptionsItemSelected = getNullableValue("onOptionsItemSelected");
+            // onMenuItemSelected
+            mOnMenuItemSelected = getNullableValue("onMenuItemSelected");
+            // onContextItemSelected
+            mOnContextItemSelected = getNullableValue("onContextItemSelected");
+            // onActivityResult
+            mOnActivityResult = getNullableValue("onActivityResult");
+            // onRequestPermissionsResult
+            onRequestPermissionsResult = getNullableValue("onRequestPermissionsResult");
+            // onConfigurationChanged
+            mOnConfigurationChanged = getNullableValue("onConfigurationChanged");
+            // onReceive
+            mOnReceive = getNullableValue("onReceive");
+            // mOnError
+            mOnError = getNullableValue("onError");
+            // mOnNewIntent
+            mOnNewIntent = getNullableValue("onNewIntent");
+            onLuaEvent(mOnCreate);
+            Intent intent = getIntent();
+            if (savedInstanceState == null) {
+                if (intent.getData() != null) {
+                    onLuaEvent(mOnNewIntent, intent);
+                }
+                if (intent.getBooleanExtra("isVersionChanged", false))
+                    runFunc("isVersionChanged", intent.getStringExtra("newVersionName"), intent.getStringExtra("oldVersionName"));
+                String arg = intent.getStringExtra("arg");
+                if (arg != null)
+                    runFunc("main", arg);
+            }
         } catch (Exception e) {
             sendError(e);
         }
-        // 绑定事件
-        // onCreate
-        mOnCreate = getNullableValue("onCreate");
-        // onKeyEvent
-        mOnKeyShortcut = getNullableValue("onKeyShortcut");
-        mOnKeyDown = getNullableValue("onKeyDown");
-        mOnKeyUp = getNullableValue("onKeyUp");
-        mOnKeyLongPress = getNullableValue("onKeyLongPress");
-        // onTouchEvent
-        mOnTouchEvent = getNullableValue("onTouchEvent");
-        // onAccessibilityEvent
-        mOnAccessibilityEvent = getNullableValue("onAccessibilityEvent");
-        // onCreateOptionsMenu
-        mOnCreateOptionsMenu = getNullableValue("onCreateOptionsMenu");
-        // mOnCreateContextMenu
-        mOnCreateContextMenu = getNullableValue("onCreateContextMenu");
-        // onOptionsItemSelected
-        mOnOptionsItemSelected = getNullableValue("onOptionsItemSelected");
-        // onMenuItemSelected
-        mOnMenuItemSelected = getNullableValue("onMenuItemSelected");
-        // onContextItemSelected
-        mOnContextItemSelected = getNullableValue("onContextItemSelected");
-        // onActivityResult
-        mOnActivityResult = getNullableValue("onActivityResult");
-        // onRequestPermissionsResult
-        onRequestPermissionsResult = getNullableValue("onRequestPermissionsResult");
-        // onConfigurationChanged
-        mOnConfigurationChanged = getNullableValue("onConfigurationChanged");
-        // onReceive
-        mOnReceive = getNullableValue("onReceive");
-        // mOnError
-        mOnError = getNullableValue("onError");
     }
 
     public void loadLua() {
@@ -355,6 +358,12 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        onLuaEvent(mOnNewIntent, intent);
+        super.onNewIntent(intent);
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (mOnActivityResult != null) mOnActivityResult.call(requestCode, resultCode, data);
         super.onActivityResult(requestCode, resultCode, data);
@@ -446,41 +455,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         return mHeight;
     }
 
-    public void newActivity(String path) throws FileNotFoundException {
-        newActivity(1, path, new Object[0]);
-    }
-
-    public void newActivity(String path, Object[] arg) throws FileNotFoundException {
-        newActivity(1, path, arg);
-    }
-
-    public void newActivity(int req, String path) throws FileNotFoundException {
-        newActivity(req, path, new Object[0]);
-    }
-
-    public void newActivity(int req, String path, Object[] arg) throws FileNotFoundException {
-        Intent intent = new Intent(this, LuaActivity.class);
-        startActivityForResult(intent, req);
-    }
-
-    public void newActivity(String path, int in, int out) throws FileNotFoundException {
-        newActivity(1, path, in, out, new Object[0]);
-    }
-
-    public void newActivity(String path, int in, int out, Object[] arg) throws FileNotFoundException {
-        newActivity(1, path, in, out, arg);
-    }
-
-    public void newActivity(int req, String path, int in, int out) throws FileNotFoundException {
-        newActivity(req, path, in, out, new Object[0]);
-    }
-
-    public void newActivity(int req, String path, int in, int out, Object[] arg) throws FileNotFoundException {
-        Intent intent = new Intent(this, LuaActivity.class);
-        startActivityForResult(intent, req);
-        overridePendingTransition(in, out);
-    }
-
     @SuppressLint("ObsoleteSdkInt")
     public void finish(boolean finishTask) {
         if (finishTask && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -546,7 +520,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     // 显示toast
-    @SuppressLint("ShowToast")
     public void showToast(String text) {
         long now = System.currentTimeMillis();
         if (toast == null || now - toastTime > 1000) {
@@ -588,6 +561,8 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
                     adapter.notifyDataSetChanged();
                 }
             });
+        } else {
+            showToast(message);
         }
     }
 
@@ -608,6 +583,8 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
                     }
                 });
             }
+        } else {
+            showToast(message);
         }
     }
 
