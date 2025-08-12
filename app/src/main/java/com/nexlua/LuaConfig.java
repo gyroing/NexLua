@@ -2,6 +2,10 @@ package com.nexlua;
 
 import android.Manifest;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 public final class LuaConfig {
     public static final String APP_NAME = "NexLua"; // 软件名称
     public static final String PACKAGE_NAME = "com.nexlua"; // 软件包名
@@ -31,4 +35,14 @@ public final class LuaConfig {
             // 跳过解压的文件
             // "res/gradle.tar.xz"
     };
+    // Lua 入口文件
+    public static final String LUA_ENTRY = "main.lua";
+    // 抽离到 Dex 的 Lua 的映射表
+    public static final Map<String, Class<?>> LUA_DEX_MAP;
+
+    static {
+        Map<String, Class<?>> map = new HashMap<>();
+        map.put("main2.lua", com.nexlua.Main2.class);
+        LUA_DEX_MAP = Collections.unmodifiableMap(map);
+    }
 }
