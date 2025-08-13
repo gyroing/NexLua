@@ -47,8 +47,8 @@ public class LuaApplication extends Application implements LuaContext {
     public void onCreate() {
         super.onCreate();
         mApplication = this;
-        Thread.setDefaultUncaughtExceptionHandler(new GlobalCrashHandler(this));
         mSharedPreferences = getSharedPreferences(this);
+        CrashHandler.getInstance().init(this);
         JuaAPI.setContext(this);
         initializeLua();
         initializeLuaEvent();
