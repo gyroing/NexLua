@@ -50,12 +50,6 @@ public class LuaApplication extends Application implements LuaContext {
                 .append(luaLibDir).append("/?.lua;")
                 .append(luaLibDir).append("/lua/?.lua;")
                 .append(luaLibDir).append("/?/init.lua;");
-        if (!luaDir.equals(getFilesDir())) {
-            cpath.append(luaDir).append("/lib?.so;");
-            lpath.append(luaDir).append("/?.lua;")
-                    .append(luaDir).append("/lua/?.lua;")
-                    .append(luaDir).append("/?/init.lua;");
-        }
         luaCpath = cpath.toString();
         luaLpath = lpath.toString();
         try {
