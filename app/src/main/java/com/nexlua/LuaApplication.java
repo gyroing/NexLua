@@ -38,19 +38,37 @@ public class LuaApplication extends Application implements LuaContext {
         mApplication = this;
         mSharedPreferences = getSharedPreferences(this);
         CrashHandler.getInstance().init(this);
+        // 获取 luaDir, luaFile, luaCpath, luaLpath
         luaDir = getFilesDir();
         luaFile = new File(luaDir, "app.lua");
+        File luaLibDir = getDir("lua", Context.MODE_PRIVATE);
+        File libDir = getDir("lib", Context.MODE_PRIVATE);
+        StringBuilder cpath = new StringBuilder(128)
+                .append(getApplicationInfo().nativeLibraryDir).append("/lib?.so;")
+                .append(libDir).append("/lib?.so;");
+        StringBuilder lpath = new StringBuilder(512)
+                .append(luaLibDir).append("/?.lua;")
+                .append(luaLibDir).append("/lua/?.lua;")
+                .append(luaLibDir).append("/?/init.lua;");
+        if (!luaDir.equals(getFilesDir())) {
+            cpath.append(luaDir).append("/lib?.so;");
+            lpath.append(luaDir).append("/?.lua;")
+                    .append(luaDir).append("/lua/?.lua;")
+                    .append(luaDir).append("/?/init.lua;");
+        }
+        luaCpath = cpath.toString();
+        luaLpath = lpath.toString();
         try {
-            initializeLua();
-            LuaValue mOnCreate = L.getFunction("onCreate");
-            mOnTerminate = L.getFunction("onTerminate");
-            mOnLowMemory = L.getFunction("onLowMemory");
-            mOnTrimMemory = L.getFunction("onTrimMemory");
-            mOnConfigurationChanged = L.getFunction("onConfigurationChanged");
             if (luaFile.exists()) {
+                initializeLua();
                 L.load(ByteBuffer.wrap(LuaUtil.readAll(luaFile)), luaFile.getPath());
+                LuaValue mOnCreate = L.getFunction("onCreate");
+                mOnTerminate = L.getFunction("onTerminate");
+                mOnLowMemory = L.getFunction("onLowMemory");
+                mOnTrimMemory = L.getFunction("onTrimMemory");
+                mOnConfigurationChanged = L.getFunction("onConfigurationChanged");
+                if (mOnCreate != null) mOnCreate.call();
             }
-            if (mOnCreate != null) mOnCreate.call();
         } catch (Exception e) {
             sendError(e);
         }
@@ -179,24 +197,8 @@ public class LuaApplication extends Application implements LuaContext {
         // Lua Application
         L.pushJavaObject(this);
         L.setGlobal("application");
+        L.setGlobal("this");
         // package.path 和 cpath
-        File luaLibDir = getDir("lua", Context.MODE_PRIVATE);
-        File libDir = getDir("lib", Context.MODE_PRIVATE);
-        StringBuilder cpath = new StringBuilder(128)
-                .append(getApplicationInfo().nativeLibraryDir).append("/lib?.so;")
-                .append(libDir).append("/lib?.so;");
-        StringBuilder lpath = new StringBuilder(512)
-                .append(luaLibDir).append("/?.lua;")
-                .append(luaLibDir).append("/lua/?.lua;")
-                .append(luaLibDir).append("/?/init.lua;");
-        if (!luaDir.equals(getFilesDir())) {
-            cpath.append(luaDir).append("/lib?.so;");
-            lpath.append(luaDir).append("/?.lua;")
-                    .append(luaDir).append("/lua/?.lua;")
-                    .append(luaDir).append("/?/init.lua;");
-        }
-        luaCpath = cpath.toString();
-        luaLpath = lpath.toString();
         L.getGlobal("package");
         if (L.isTable(-1)) {
             L.push(luaLpath);
