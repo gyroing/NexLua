@@ -1080,6 +1080,16 @@ public abstract class AbstractLua implements Lua {
     }
 
     @Override
+    public LuaValue getFunction(String funcName) {
+        getGlobal(funcName);
+        if (isFunction(-1)) {
+            return get();
+        }
+        pop(1);
+        return null;
+    }
+
+    @Override
     public LuaValue[] eval(String command) throws LuaException {
         load(command);
         return get().call();

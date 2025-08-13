@@ -42,7 +42,7 @@ public final class LuaConfig {
 
     static {
         Map<String, Class<?>> map = new HashMap<>();
-//        map.put("main2.lua", com.nexlua.Main2.class);
+        // map.put("main2.lua", com.nexlua.Main2.class);
         LUA_DEX_MAP = Collections.unmodifiableMap(map);
     }
 }

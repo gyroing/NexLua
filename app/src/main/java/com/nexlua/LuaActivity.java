@@ -53,15 +53,12 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     private LuaValue mOnKeyDown, mOnKeyUp, mOnKeyLongPress, mOnKeyShortcut, mOnTouchEvent, mOnAccessibilityEvent;
     private LuaValue mOnCreateOptionsMenu, mOnCreateContextMenu, mOnOptionsItemSelected, mOnMenuItemSelected, mOnContextItemSelected;
     private LuaValue mOnActivityResult, onRequestPermissionsResult;
-    private LuaValue mOnConfigurationChanged, mOnCreate, mOnError, mOnReceive, mOnNewIntent;
+    private LuaValue mOnConfigurationChanged, mOnError, mOnReceive, mOnNewIntent;
     private LuaBroadcastReceiver mReceiver;
     private LuaResources mResources;
-    private String luaDir, luaExtDir, odexDir, libDir, luaLibDir, luaCpath, luaLpath;
-    // Toast
-    private Toast toast;
-    private final StringBuilder toastBuilder = new StringBuilder();
-    private long toastTime;
-    private final Lua L = new LuaJit();
+    private File luaDir, luaFile;
+    private String luaLpath, luaCpath;
+    private Lua L;
     private LuaApplication app;
     private Menu optionsMenu;
 
@@ -84,14 +81,8 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         mWidth = outMetrics.widthPixels;
         mHeight = outMetrics.heightPixels;
         // 定义文件夹
-        app = (LuaApplication) getApplication();
+        app = LuaApplication.getInstance();
         luaDir = app.getLuaDir();
-        luaExtDir = app.getLuaExtDir();
-        odexDir = app.getOdexDir();
-        libDir = app.getLibDir();
-        luaLibDir = app.getLuaLibDir();
-        luaCpath = app.getLuaCpath();
-        luaLpath = app.getLuaLpath();
         initializeLua();
         mLuaDexLoader = new LuaDexLoader(this);
         mLuaDexLoader.loadLibs();
@@ -99,38 +90,38 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         try {
             loadLua();
             // onCreate
-            mOnCreate = getNullableValue("onCreate");
+            LuaValue mOnCreate = L.getFunction("onCreate");
             // onKeyEvent
-            mOnKeyShortcut = getNullableValue("onKeyShortcut");
-            mOnKeyDown = getNullableValue("onKeyDown");
-            mOnKeyUp = getNullableValue("onKeyUp");
-            mOnKeyLongPress = getNullableValue("onKeyLongPress");
+            mOnKeyShortcut = L.getFunction("onKeyShortcut");
+            mOnKeyDown = L.getFunction("onKeyDown");
+            mOnKeyUp = L.getFunction("onKeyUp");
+            mOnKeyLongPress = L.getFunction("onKeyLongPress");
             // onTouchEvent
-            mOnTouchEvent = getNullableValue("onTouchEvent");
+            mOnTouchEvent = L.getFunction("onTouchEvent");
             // onAccessibilityEvent
-            mOnAccessibilityEvent = getNullableValue("onAccessibilityEvent");
+            mOnAccessibilityEvent = L.getFunction("onAccessibilityEvent");
             // onCreateOptionsMenu
-            mOnCreateOptionsMenu = getNullableValue("onCreateOptionsMenu");
+            mOnCreateOptionsMenu = L.getFunction("onCreateOptionsMenu");
             // mOnCreateContextMenu
-            mOnCreateContextMenu = getNullableValue("onCreateContextMenu");
+            mOnCreateContextMenu = L.getFunction("onCreateContextMenu");
             // onOptionsItemSelected
-            mOnOptionsItemSelected = getNullableValue("onOptionsItemSelected");
+            mOnOptionsItemSelected = L.getFunction("onOptionsItemSelected");
             // onMenuItemSelected
-            mOnMenuItemSelected = getNullableValue("onMenuItemSelected");
+            mOnMenuItemSelected = L.getFunction("onMenuItemSelected");
             // onContextItemSelected
-            mOnContextItemSelected = getNullableValue("onContextItemSelected");
+            mOnContextItemSelected = L.getFunction("onContextItemSelected");
             // onActivityResult
-            mOnActivityResult = getNullableValue("onActivityResult");
+            mOnActivityResult = L.getFunction("onActivityResult");
             // onRequestPermissionsResult
-            onRequestPermissionsResult = getNullableValue("onRequestPermissionsResult");
+            onRequestPermissionsResult = L.getFunction("onRequestPermissionsResult");
             // onConfigurationChanged
-            mOnConfigurationChanged = getNullableValue("onConfigurationChanged");
+            mOnConfigurationChanged = L.getFunction("onConfigurationChanged");
             // onReceive
-            mOnReceive = getNullableValue("onReceive");
+            mOnReceive = L.getFunction("onReceive");
             // mOnError
-            mOnError = getNullableValue("onError");
+            mOnError = L.getFunction("onError");
             // mOnNewIntent
-            mOnNewIntent = getNullableValue("onNewIntent");
+            mOnNewIntent = L.getFunction("onNewIntent");
             onLuaEvent(mOnCreate);
             Intent intent = getIntent();
             if (savedInstanceState == null) {
@@ -150,11 +141,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
 
     public void loadLua() {
         doAssets("main.lua", null);
-    }
-
-    private LuaValue getNullableValue(String name) {
-        LuaValue luaValue = L.get(name);
-        return luaValue.type() != LuaType.NIL ? luaValue : null;
     }
 
     private boolean isViewInflated = false;
@@ -270,22 +256,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         if (mResources != null)
             return mResources;
         return super.getResources();
-    }
-
-    public Object loadLib(String name) throws LuaException {
-        int i = name.indexOf(".");
-        String fn = name;
-        if (i > 0)
-            fn = name.substring(0, i);
-        File f = new File(libDir + "/lib" + fn + ".so");
-        if (!f.exists()) {
-            f = new File(luaDir + "/lib" + fn + ".so");
-            if (!f.exists())
-                throw new LuaException(LuaError.FILE, "can not find lib " + name);
-            LuaUtil.copyFile(luaDir + "/lib" + fn + ".so", libDir + "/lib" + fn + ".so");
-        }
-        LuaValue require = L.get("require");
-        return require.call(name);
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
@@ -519,23 +489,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         }
     }
 
-    // 显示toast
-    public void showToast(String text) {
-        long now = System.currentTimeMillis();
-        if (toast == null || now - toastTime > 1000) {
-            toastBuilder.setLength(0);
-            toast = Toast.makeText(this, text, Toast.LENGTH_LONG);
-            toastBuilder.append(text);
-            toast.show();
-        } else {
-            toastBuilder.append("\n");
-            toastBuilder.append(text);
-            toast.setText(toastBuilder.toString());
-            toast.setDuration(Toast.LENGTH_LONG);
-        }
-        toastTime = now;
-    }
-
     public static void setClipboardText(String text) {
         LuaApplication.setClipboardText(text);
     }
@@ -598,21 +551,49 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     // @formatter:off
-    public ArrayList<ClassLoader> getClassLoaders() { return mLuaDexLoader.getClassLoaders(); }
-    public String getLuaPath() { /* return luaPath */ return null; }
-    public String getLuaPath(String path) { return new File(getLuaDir(), path).getAbsolutePath(); }
-    public String getLuaPath(String dir, String name) { return new File(getLuaDir(dir), name).getAbsolutePath(); }
+    public ArrayList<ClassLoader> getClassLoaders() { return null; }
+    public Lua getLua() { return L; }
+    public File getLuaFile() { return luaFile; }
+    public File getLuaDir() { return luaDir; }
+    public String getLuaPath() { return luaFile.getPath(); }
+    public String getLuaLpath() { return luaLpath; }
+    public String getLuaCpath() { return luaCpath; }
+    public Context getContext() { return this; }
     // @formatter:on
     public void initializeLua() {
-        luaDir = getFilesDir().getAbsolutePath();
-        odexDir = getDir("odex", Context.MODE_PRIVATE).getAbsolutePath();
-        libDir = getDir("lib", Context.MODE_PRIVATE).getAbsolutePath();
-        luaLibDir = getDir("lua", Context.MODE_PRIVATE).getAbsolutePath();
-        luaCpath = getApplicationInfo().nativeLibraryDir + "/lib?.so" + ";" + libDir + "/lib?.so";
-        luaLpath = luaLibDir + "/?.lua;" + luaLibDir + "/lua/?.lua;" + luaLibDir + "/?/init.lua;";
-        L.openLibraries();
+        L = new LuaJit();
         for (String libraryName : new String[]{"package", "string", "table", "math", "io", "os", "debug"})
             L.openLibrary(libraryName);
+        // Lua Application
+        L.pushJavaObject(this);
+        L.setGlobal("application");
+        // package.path 和 cpath
+        File luaLibDir = getDir("lua", Context.MODE_PRIVATE);
+        File libDir = getDir("lib", Context.MODE_PRIVATE);
+        StringBuilder cpath = new StringBuilder(128)
+                .append(getApplicationInfo().nativeLibraryDir).append("/lib?.so;")
+                .append(libDir).append("/lib?.so;");
+        StringBuilder lpath = new StringBuilder(512)
+                .append(luaLibDir).append("/?.lua;")
+                .append(luaLibDir).append("/lua/?.lua;")
+                .append(luaLibDir).append("/?/init.lua;");
+        if (!luaDir.equals(getFilesDir())) {
+            cpath.append(luaDir).append("/lib?.so;");
+            lpath.append(luaDir).append("/?.lua;")
+                    .append(luaDir).append("/lua/?.lua;")
+                    .append(luaDir).append("/?/init.lua;");
+        }
+        luaCpath = cpath.toString();
+        luaLpath = lpath.toString();
+        L.getGlobal("package");
+        if (L.isTable(-1)) {
+            L.push(luaLpath);
+            L.setField(-2, "path");
+            L.push(luaCpath);
+            L.setField(-2, "cpath");
+        }
+        L.pop(1); // pop package 或 nil
+        // push activity
         L.pushJavaObject(this);
         L.setGlobal("activity");
         L.getGlobal("activity");
@@ -632,22 +613,4 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         L.setField(-2, "cpath");
         L.pop(1);
     }
-
-    // @formatter:off
-    public Lua getLua() { return L; }
-    public String getLuaDir() { return luaDir; }
-    public String getLuaDir(String dir) { return new File(getLuaDir(), dir).getAbsolutePath(); }
-    public String getLuaExtDir() { return luaExtDir; }
-    public String getLuaExtDir(String dir) { return new File(luaExtDir, dir).getAbsolutePath(); }
-    public String getLuaExtPath(String path) { return new File(getLuaExtDir(), path).getAbsolutePath(); }
-    public String getLuaExtPath(String dir, String name) { return new File(getLuaExtDir(dir), name).getAbsolutePath(); }
-    public String getOdexDir() { return odexDir; }
-    public String getLibDir() { return libDir; }
-    public String getLuaLibDir() { return luaLibDir; }
-    public String getLuaLpath() { return luaLpath; }
-    public String getLuaCpath() { return luaCpath; }
-    public Context getContext() { return this; }
-    public void setLuaExtDir(String dir) { luaExtDir =  dir; }
-    public void setLuaDir(String dir) { luaDir = dir; }
-    // @formatter:on
 }

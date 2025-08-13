@@ -9,9 +9,4 @@ public class Main extends LuaActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
     }
-
-    @Override
-    public String getLuaDir() {
-        return super.getLuaDir();
-    }
 }

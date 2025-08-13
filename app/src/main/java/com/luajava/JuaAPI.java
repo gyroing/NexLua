@@ -23,7 +23,6 @@
 package com.luajava;
 
 
-
 import android.content.Context;
 
 import com.luajava.util.ClassUtils;
@@ -867,6 +866,7 @@ public abstract class JuaAPI {
 
     /**
      * Matches methods against values on stack
+     *
      * @param L       the lua state
      * @param methods filtered methods that only differ in their parameters
      * @param params  an array to store converted parameters
@@ -1126,19 +1126,6 @@ public abstract class JuaAPI {
                     return executable.getParameterTypes();
                 }
             };
-    // LuaJava API Compatibility
-    private static Context mApplicationContext;
-    public static void setContext(Context context) {
-        mApplicationContext = context.getApplicationContext();
-    }
-    public static int getContext(int stateIndex) {
-        Lua L = Jua.get(stateIndex);
-        if (mApplicationContext != null) {
-            L.pushJavaObject(mApplicationContext);
-            return 1;
-        }
-        return 0;
-    }
 
     public static int toString(int stateIndex, Object obj) {
         Lua L = Jua.get(stateIndex);
@@ -1155,9 +1142,9 @@ public abstract class JuaAPI {
     public static int coding(int stateIndex) {
         Lua L = Jua.get(stateIndex);
         try {
-            String str = L.type(1)==LuaType.STRING ? L.toString(1) : null;
-            String from = L.type(2)==LuaType.STRING ? L.toString(2) : "GBK";
-            String to = L.type(3)==LuaType.STRING ? L.toString(3) : "UTF-8";
+            String str = L.type(1) == LuaType.STRING ? L.toString(1) : null;
+            String from = L.type(2) == LuaType.STRING ? L.toString(2) : "GBK";
+            String to = L.type(3) == LuaType.STRING ? L.toString(3) : "UTF-8";
             if (str != null) {
                 byte[] bytes = str.getBytes(from);
                 String newStr = new String(bytes, to);

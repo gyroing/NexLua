@@ -23,20 +23,20 @@ public class LuaDexLoader {
 
     private LuaContext mContext;
 
-    private String luaDir;
+    private File luaDir;
 
     private AssetManager mAssetManager;
 
     private LuaResources mResources;
     private Resources.Theme mTheme;
-    private String odexDir;
+    private File odexDir;
 
     public LuaDexLoader(LuaContext context) {
         mContext = context;
         luaDir = context.getLuaDir();
         LuaApplication app = LuaApplication.getInstance();
         //localDir = app.getLocalDir();
-        odexDir = app.getOdexDir();
+        odexDir = new File(luaDir, "odex");
     }
 
     public Resources.Theme getTheme() {
@@ -54,7 +54,7 @@ public class LuaDexLoader {
             if (dex == null) {
                 PackageManager manager = mContext.getContext().getPackageManager();
                 ApplicationInfo info = manager.getPackageInfo(pkg, 0).applicationInfo;
-                dex = new LuaDexClassLoader(info.publicSourceDir, LuaApplication.getInstance().getOdexDir(), info.nativeLibraryDir, mContext.getContext().getClassLoader());
+                dex = new LuaDexClassLoader(info.publicSourceDir, odexDir.getPath(), info.nativeLibraryDir, mContext.getContext().getClassLoader());
                 dexCache.put(pkg, dex);
             }
             if (!dexList.contains(dex)) {
@@ -128,7 +128,7 @@ public class LuaDexLoader {
             dex = dexCache.get(id);
 
             if (dex == null) {
-                dex = new LuaDexClassLoader(path, odexDir, LuaApplication.getInstance().getApplicationInfo().nativeLibraryDir, mContext.getContext().getClassLoader());
+                dex = new LuaDexClassLoader(path, odexDir.getPath(), LuaApplication.getInstance().getApplicationInfo().nativeLibraryDir, mContext.getContext().getClassLoader());
                 dexCache.put(id, dex);
             }
         }

@@ -20,6 +20,14 @@ public interface LuaThread {
     LuaValue get(String globalName);
 
     /**
+     * Gets a reference to a function
+     *
+     * @param funcName the global name
+     * @return a reference to the function
+     */
+    LuaValue getFunction(String funcName);
+
+    /**
      * Registers the function to a global name
      *
      * @param name     the global name

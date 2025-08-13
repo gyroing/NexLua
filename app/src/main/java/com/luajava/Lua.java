@@ -22,6 +22,8 @@
 
 package com.luajava;
 
+import android.content.Context;
+
 import com.luajava.value.LuaFunction;
 import com.luajava.value.LuaThread;
 import com.luajava.value.LuaValue;
@@ -268,7 +270,8 @@ public interface Lua extends AutoCloseable, LuaThread {
     @Nullable
     String toString(int index);
 
-    @Nullable String ltoString(int index);
+    @Nullable
+    String ltoString(int index);
 
     /**
      * Creates a {@link java.nio.ByteBuffer} from the string at the specific index
@@ -773,7 +776,7 @@ public interface Lua extends AutoCloseable, LuaThread {
 
     /**
      * Creates a new empty table and pushes it onto the stack
-     * 
+     *
      * <p>
      * It is equivalent to {@link #createTable(int, int) createTable(0, 0)}.
      * </p>

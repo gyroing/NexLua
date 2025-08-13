@@ -90,6 +90,20 @@ public class LuaUtil {
         }
     }
 
+    public static byte[] readAll(File file) throws IOException {
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(file);
+            return readAll(fis);
+        } finally {
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException ignored) {}
+            }
+        }
+    }
+
 
     //复制asset文件到sd卡
     public static void assetsToSD(Context context, String InFileName, String OutFileName) throws IOException {
