@@ -74,8 +74,7 @@
             android:name="com.nexlua.Main"
             android:exported="true" />
         <activity
-            android:name="com.nexlua.CrashActivity"
-            android:process=":crash"
-            android:theme="@style/AppTheme" />
+            android:name="com.nexlua.LuaActivity"
+            android:exported="true" />
     </application>
 </manifest>

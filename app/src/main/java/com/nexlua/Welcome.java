@@ -10,6 +10,8 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.io.File;
 import java.io.IOException;
 
 
@@ -37,19 +39,22 @@ public class Welcome extends Activity {
 
     public void startActivity(boolean isVersionChanged) {
         Intent intent = new Intent(Welcome.this, Main.class);
+        intent.putExtra(LuaContext.LUA_PATH, new File(getFilesDir(), LuaConfig.LUA_ENTRY).getPath());
         if (isVersionChanged) {
             intent.putExtra("isVersionChanged", true);
             intent.putExtra("newVersionName", newVersionName);
             intent.putExtra("oldVersionName", oldVersionName);
-            AssetExtractor.extractAssets(this, new AssetExtractor.ExtractCallback(){
+            AssetExtractor.extractAssets(this, new AssetExtractor.ExtractCallback() {
                 @Override
                 public void onStart() {
                 }
+
                 @Override
                 public void onSuccess() {
                     startActivity(intent);
                     finish();
                 }
+
                 @Override
                 public void onError(IOException e) {
                 }

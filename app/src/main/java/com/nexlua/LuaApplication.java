@@ -9,6 +9,7 @@ import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.preference.PreferenceManager;
+import android.util.Log;
 
 import com.luajava.Lua;
 import com.luajava.luajit.LuaJit;
@@ -43,16 +44,12 @@ public class LuaApplication extends Application implements LuaContext {
         luaFile = new File(luaDir, "app.lua");
         File luaLibDir = getDir("lua", Context.MODE_PRIVATE);
         File libDir = getDir("lib", Context.MODE_PRIVATE);
-        StringBuilder cpath = new StringBuilder(128)
-                .append(getApplicationInfo().nativeLibraryDir).append("/lib?.so;")
-                .append(libDir).append("/lib?.so;");
-        StringBuilder lpath = new StringBuilder(512)
-                .append(luaLibDir).append("/?.lua;")
-                .append(luaLibDir).append("/lua/?.lua;")
-                .append(luaLibDir).append("/?/init.lua;");
-        luaCpath = cpath.toString();
-        luaLpath = lpath.toString();
+        luaCpath = getApplicationInfo().nativeLibraryDir + "/lib?.so;" + libDir + "/lib?.so;";
+        luaLpath = luaLibDir + "/?.lua;" + luaLibDir + "/lua/?.lua;" + luaLibDir + "/?/init.lua;";
         try {
+            Log.i("WHAT THE FUCK!", luaDir.getAbsolutePath());
+            Log.i("WHAT THE FUCK!", luaFile.getAbsolutePath());
+            Log.i("WHAT THE FUCK!", String.valueOf(luaFile.exists()));
             if (luaFile.exists()) {
                 initializeLua();
                 L.load(ByteBuffer.wrap(LuaUtil.readAll(luaFile)), luaFile.getPath());
@@ -190,6 +187,7 @@ public class LuaApplication extends Application implements LuaContext {
             L.openLibrary(libraryName);
         // Lua Application
         L.pushJavaObject(this);
+        L.pushValue(-1);
         L.setGlobal("application");
         L.setGlobal("this");
         // package.path 和 cpath

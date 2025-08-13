@@ -60,7 +60,6 @@ jmethodID throwable_getmessage   = NULL;
 jmethodID throwable_tostring     = NULL;
 // LuaJava API Compatibility
 jmethodID juaapi_isinstanceof;
-jmethodID juaapi_getcontext;
 // jmethodID juaapi_override;
 jmethodID juaapi_createarray;
 jmethodID juaapi_astable;
@@ -198,7 +197,6 @@ int initBindings(JNIEnv * env) {
           "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
   // LuaJava API Compatibility
   juaapi_isinstanceof = bindJavaStaticMethod(env, juaapi_class, "isInstanceOf", "(ILjava/lang/Object;Ljava/lang/Class;)I");
-  juaapi_getcontext   = bindJavaStaticMethod(env, juaapi_class, "getContext", "(I)I");
   juaapi_createarray  = bindJavaStaticMethod(env, juaapi_class, "createArray", "(ILjava/lang/Class;I)I");
   juaapi_astable      = bindJavaStaticMethod(env, juaapi_class, "asTable", "(ILjava/lang/Object;)I");
   juaapi_tostring     = bindJavaStaticMethod(env, juaapi_class, "toString", "(ILjava/lang/Object;)I");
@@ -233,7 +231,6 @@ int initBindings(JNIEnv * env) {
       || juaapi_allocatedirect == NULL
       // LuaJava API Compatibility
       || juaapi_isinstanceof == NULL
-      || juaapi_getcontext   == NULL
       // || juaapi_override     == NULL
       || juaapi_createarray  == NULL
       || juaapi_astable      == NULL

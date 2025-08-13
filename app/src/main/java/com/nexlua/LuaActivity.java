@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.StrictMode;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.ContextMenu;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -25,17 +26,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.view.WindowManager;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.luajava.Lua;
-import com.luajava.Lua.LuaType;
 import com.luajava.LuaException;
-import com.luajava.LuaException.LuaError;
 import com.luajava.luajit.LuaJit;
 import com.luajava.value.LuaValue;
 
@@ -43,6 +40,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 
 import dalvik.system.DexClassLoader;
@@ -53,7 +51,8 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     private LuaValue mOnKeyDown, mOnKeyUp, mOnKeyLongPress, mOnKeyShortcut, mOnTouchEvent, mOnAccessibilityEvent;
     private LuaValue mOnCreateOptionsMenu, mOnCreateContextMenu, mOnOptionsItemSelected, mOnMenuItemSelected, mOnContextItemSelected;
     private LuaValue mOnActivityResult, onRequestPermissionsResult;
-    private LuaValue mOnConfigurationChanged, mOnError, mOnReceive, mOnNewIntent;
+    private LuaValue mOnConfigurationChanged;
+    private LuaValue mOnError, mOnReceive, mOnNewIntent, mOnResult;
     private LuaBroadcastReceiver mReceiver;
     private LuaResources mResources;
     private File luaDir, luaFile;
@@ -80,9 +79,14 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         wm.getDefaultDisplay().getMetrics(outMetrics);
         mWidth = outMetrics.widthPixels;
         mHeight = outMetrics.heightPixels;
-        // 定义文件夹
+        // 获取传入 path 参数, 定义 luaDir
         app = LuaApplication.getInstance();
-        luaDir = app.getLuaDir();
+        Intent intent = getIntent();
+        luaFile = new File(intent.getStringExtra(LuaContext.LUA_PATH));
+        luaDir = luaFile.getParentFile();
+        luaCpath = app.getLuaCpath();
+        luaLpath = app.getLuaLpath();
+        // 初始化 Lua 环境
         initializeLua();
         mLuaDexLoader = new LuaDexLoader(this);
         mLuaDexLoader.loadLibs();
@@ -118,34 +122,26 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
             mOnConfigurationChanged = L.getFunction("onConfigurationChanged");
             // onReceive
             mOnReceive = L.getFunction("onReceive");
-            // mOnError
+            // onError
             mOnError = L.getFunction("onError");
-            // mOnNewIntent
+            // onNewIntent
             mOnNewIntent = L.getFunction("onNewIntent");
+            // onResult
+            mOnResult = L.getFunction("onResult");
             onLuaEvent(mOnCreate);
-            Intent intent = getIntent();
-            if (savedInstanceState == null) {
-                if (intent.getData() != null) {
-                    onLuaEvent(mOnNewIntent, intent);
-                }
-                if (intent.getBooleanExtra("isVersionChanged", false))
-                    runFunc("isVersionChanged", intent.getStringExtra("newVersionName"), intent.getStringExtra("oldVersionName"));
-                String arg = intent.getStringExtra("arg");
-                if (arg != null)
-                    runFunc("main", arg);
-            }
+            Object[] arg = (Object[]) intent.getSerializableExtra(LuaContext.LUA_ARG);
+            if (arg != null) runFunc("main", arg);
         } catch (Exception e) {
             sendError(e);
         }
     }
 
     public void loadLua() {
-        doAssets("main.lua", null);
+        doFile(getLuaFile());
     }
 
     private boolean isViewInflated = false;
     private LinearLayout consoleLayout;
-    private ListView listView;
     private ArrayAdapter<String> adapter;
 
     @Override
@@ -179,26 +175,14 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
             array.recycle();
             // 初始化控件
             consoleLayout = new LinearLayout(this);
-            listView = new ListView(this);
+            ListView listView = new ListView(this);
             listView.setFastScrollEnabled(true);
             listView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
-            listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                }
-            });
-            listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-                @Override
-                public boolean onItemLongClick(AdapterView<?> adapterView, View view, int i, long l) {
-                    setClipboardText(adapter.getItem(i));
-                    showToast("复制成功");
-                    return true;
-                }
-            });
             adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1) {
                 @Override
                 public View getView(int position, View convertView, ViewGroup parent) {
                     TextView view = (TextView) super.getView(position, convertView, parent);
+                    view.setTextIsSelectable(true);
                     view.setTextColor(textColor);
                     return view;
                 }
@@ -334,12 +318,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (mOnActivityResult != null) mOnActivityResult.call(requestCode, resultCode, data);
-        super.onActivityResult(requestCode, resultCode, data);
-    }
-
-    @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         if (onRequestPermissionsResult != null)
             onRequestPermissionsResult.call(requestCode, permissions, grantResults);
@@ -447,24 +425,39 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     // 运行lua脚本
-    public Object doFile(String filePath) throws IOException {
+    public Object doFile(File filePath) {
         return doFile(filePath, new Object[0]);
     }
 
-    public Object doFile(String filePath, Object[] args) throws IOException {
-        String path = (filePath.charAt(0) != '/')
-                ? luaDir + "/" + filePath
-                : filePath;
-        L.run(ByteBuffer.wrap(LuaUtil.readAll(filePath)), filePath);
-        return L.toObject(-1);
+    public Object doFile(File file, Object[] args) {
+        try {
+            byte[] bytes = LuaUtil.readAll(file);
+            ByteBuffer directBuffer = ByteBuffer.allocateDirect(bytes.length);
+            directBuffer.put(bytes);
+            directBuffer.flip();
+            L.run(directBuffer, file.getPath());
+            if (args != null) for (Object arg : args)
+                L.push(arg, Lua.Conversion.SEMI);
+            return L.toObject(-1);
+        } catch (IOException e) {
+            sendError(e);
+            return null;
+        }
     }
 
     public Object doAssets(String name, Object[] args) {
         try {
-            L.run(new String(LuaUtil.readAsset(this, name)));
+            byte[] bytes = LuaUtil.readAsset(this, name);
+            ByteBuffer directBuffer = ByteBuffer.allocateDirect(bytes.length);
+            directBuffer.put(bytes);
+            directBuffer.flip();
+            L.run(directBuffer, name);
+            if (args != null) for (Object arg : args)
+                L.push(arg, Lua.Conversion.SEMI);
             return L.toObject(-1);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            sendError(e);
+            return null;
         }
     }
 
@@ -487,6 +480,55 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
             L.pCall(args.length, 1);
             return L.toObject(-1);
         }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
+        if (intent != null) {
+            String name = intent.getStringExtra(LuaContext.LUA_NEW_ACTIVITY_NAME);
+            if (name != null) {
+                Object[] res = (Object[]) intent.getSerializableExtra(LuaContext.LUA_NEW_ACTIVITY_DATA);
+                if (res == null) {
+                    runFunc("onResult", name);
+                } else {
+                    Object[] arg = new Object[res.length + 1];
+                    arg[0] = name;
+                    System.arraycopy(res, 0, arg, 1, res.length);
+                    Object ret = runFunc("onResult", arg);
+                    if (ret != null && ret.getClass() == Boolean.class && (Boolean) ret)
+                        return;
+                }
+            }
+        }
+        runFunc("onActivityResult", requestCode, resultCode, intent);
+        super.onActivityResult(requestCode, resultCode, intent);
+    }
+
+    public void newActivity(String name, Object... args) {
+        File file = new File(luaDir, name);
+        if (!file.exists()) file = new File(name);
+        Intent intent = new Intent(this, LuaActivity.class);
+        intent.putExtra(LuaContext.LUA_PATH, file.getPath());
+        intent.putExtra(LuaContext.LUA_ARG, args);
+        startActivity(intent);
+    }
+
+    public void newActivityForResult(String name, int requestCode, Object... args) {
+        File file = new File(luaDir, name);
+        if (!file.exists()) file = new File(name);
+        Intent intent = new Intent(this, LuaActivity.class);
+        intent.putExtra(LuaContext.LUA_NEW_ACTIVITY_NAME, file.getPath());
+        intent.putExtra(LuaContext.LUA_PATH, file.getPath());
+        intent.putExtra(LuaContext.LUA_ARG, args);
+        startActivityForResult(intent, requestCode);
+    }
+
+    public void setActivityResult(Object[] data) {
+        Intent res = new Intent();
+        res.putExtra(LuaContext.LUA_NEW_ACTIVITY_NAME, getIntent().getStringExtra(LuaContext.LUA_NEW_ACTIVITY_NAME));
+        res.putExtra(LuaContext.LUA_NEW_ACTIVITY_DATA, data);
+        setResult(0, res);
+        finish();
     }
 
     public static void setClipboardText(String text) {
@@ -541,15 +583,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         }
     }
 
-    public void sendError(Exception e) {
-        if (e instanceof LuaException) {
-            LuaException luaException = (LuaException) e;
-            sendError(luaException.getType(), luaException.getMessage());
-        } else {
-            sendError(e.getClass().getSimpleName(), e.getMessage());
-        }
-    }
-
     // @formatter:off
     public ArrayList<ClassLoader> getClassLoaders() { return null; }
     public Lua getLua() { return L; }
@@ -564,53 +597,30 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         L = new LuaJit();
         for (String libraryName : new String[]{"package", "string", "table", "math", "io", "os", "debug"})
             L.openLibrary(libraryName);
-        // Lua Application
-        L.pushJavaObject(this);
-        L.setGlobal("application");
         // package.path 和 cpath
-        File luaLibDir = getDir("lua", Context.MODE_PRIVATE);
-        File libDir = getDir("lib", Context.MODE_PRIVATE);
-        StringBuilder cpath = new StringBuilder(128)
-                .append(getApplicationInfo().nativeLibraryDir).append("/lib?.so;")
-                .append(libDir).append("/lib?.so;");
-        StringBuilder lpath = new StringBuilder(512)
-                .append(luaLibDir).append("/?.lua;")
-                .append(luaLibDir).append("/lua/?.lua;")
-                .append(luaLibDir).append("/?/init.lua;");
-        if (!luaDir.equals(getFilesDir())) {
-            cpath.append(luaDir).append("/lib?.so;");
-            lpath.append(luaDir).append("/?.lua;")
-                    .append(luaDir).append("/lua/?.lua;")
-                    .append(luaDir).append("/?/init.lua;");
+        if (!luaDir.equals(app.getLuaDir())) {
+            luaCpath = luaCpath + luaDir + "/lib?.so;";
+            luaLpath = luaLpath + luaDir + "/?.lua;" + luaDir + "/lua/?.lua;" + luaDir + "/?/init.lua;";
+            L.getGlobal("package");
+            if (L.isTable(-1)) {
+                L.push(luaLpath);
+                L.setField(-2, "path");
+                L.push(luaCpath);
+                L.setField(-2, "cpath");
+            }
+            L.pop(1); // pop package 或 nil
         }
-        luaCpath = cpath.toString();
-        luaLpath = lpath.toString();
-        L.getGlobal("package");
-        if (L.isTable(-1)) {
-            L.push(luaLpath);
-            L.setField(-2, "path");
-            L.push(luaCpath);
-            L.setField(-2, "cpath");
-        }
-        L.pop(1); // pop package 或 nil
-        // push activity
+        // 插入 LuaActivity
         L.pushJavaObject(this);
+        L.pushValue(-1);
         L.setGlobal("activity");
-        L.getGlobal("activity");
         L.setGlobal("this");
-        // LuaPrint
+        // 插入 LuaPrint
         LuaPrint print = new LuaPrint(this);
         L.push(print);
         L.setGlobal("print");
-        // 插入全局 LuaApplication
+        // 插入 LuaApplication
         L.pushJavaObject(app);
         L.setGlobal("application");
-        // 插入 luaLpath
-        L.getGlobal("package");
-        L.push(luaLpath);
-        L.setField(-2, "path");
-        L.push(luaCpath);
-        L.setField(-2, "cpath");
-        L.pop(1);
     }
 }

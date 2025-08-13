@@ -176,11 +176,6 @@ static int javaIsInstanceOf(lua_State *L) {
                                                          (jint)stateIndex, *obj, *clazz));
 }
 
-static int javaGetContext(lua_State *L) {
-    JNIEnv *env = getJNIEnv(L);
-    int stateIndex = getStateIndex(L);
-    return checkOrError(env, L, env->CallStaticIntMethod(juaapi_class, juaapi_getcontext, (jint)stateIndex));
-}
 
 //static int javaOverride(lua_State *L) {
 //    luaL_checkudata(L, 1, JAVA_CLASS_META_REGISTRY);
@@ -261,7 +256,6 @@ const luaL_Reg javalib[] = {
         {"coding",      javaCoding},
         // {"clear",       gc},
         {"instanceof",  javaIsInstanceOf},
-        {"getContext",  javaGetContext},
         // {"override",    javaOverride},
         {NULL, NULL}
 };

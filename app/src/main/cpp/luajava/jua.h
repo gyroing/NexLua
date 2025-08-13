@@ -37,7 +37,6 @@ extern jmethodID juaapi_loadlib;
 extern jmethodID throwable_tostring;
 // LuaJava API Compatibility
 extern jmethodID juaapi_isinstanceof;
-extern jmethodID juaapi_getcontext;
 // extern jmethodID juaapi_override;
 extern jmethodID juaapi_createarray;
 extern jmethodID juaapi_astable;

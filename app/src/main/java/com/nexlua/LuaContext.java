@@ -6,13 +6,17 @@ import android.widget.Toast;
 
 import com.luajava.Lua;
 import com.luajava.LuaException;
-import com.luajava.value.LuaValue;
 
 import java.io.File;
-import java.lang.ref.WeakReference;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 
 public interface LuaContext {
+    String LUA_PATH = "path";
+    String LUA_ARG = "arg";
+    String LUA_NEW_ACTIVITY_NAME = "name";
+    String LUA_NEW_ACTIVITY_DATA = "data";
     ArrayList<ClassLoader> getClassLoaders();
 
     Lua getLua();
@@ -42,9 +46,11 @@ public interface LuaContext {
     default void sendError(Exception e) {
         if (e instanceof LuaException) {
             LuaException luaException = (LuaException) e;
-            sendError(luaException.getType(), luaException.getMessage());
+            sendError(luaException.getType(), e.getMessage());
         } else {
-            sendError(e.getClass().getSimpleName(), e.getMessage());
+            StringWriter sw = new StringWriter();
+            e.printStackTrace(new PrintWriter(sw));
+            sendError(e.getClass().getSimpleName(), sw.toString());
         }
     }
 }
