@@ -56,6 +56,7 @@ public abstract class AbstractLua implements Lua {
     protected final int id;
     protected final AbstractLua mainThread;
     protected final List<Lua> subThreads;
+    private int tracebackRef = 0;
 
     /**
      * Creates a new Lua (main) state
@@ -616,6 +617,11 @@ public abstract class AbstractLua implements Lua {
 
     @Override
     public void run(String script) throws LuaException {
+        if (tracebackRef != 0) {
+            load(script);
+            pCall(0, 0);
+            return;
+        }
         checkStack(1);
         checkError(C.luaL_dostring(L, script), true);
     }
@@ -638,6 +644,12 @@ public abstract class AbstractLua implements Lua {
     @Override
     public void pCall(int nArgs, int nResults) throws LuaException {
         checkStack(Math.max(nResults - nArgs - 1, 0));
+        if (this.tracebackRef != 0) {
+            refGet(this.tracebackRef);
+            insert(-(nArgs + 2));
+            checkError(C.lua_pcall(L, nArgs, nResults, getTop() - nArgs - 1), false);
+            return;
+        }
         checkError(C.lua_pcall(L, nArgs, nResults, 0), false);
     }
 
@@ -1211,6 +1223,31 @@ public abstract class AbstractLua implements Lua {
                 }
             }
             return results == null ? 0 : results.length;
+        }
+    }
+
+    @Override
+    public void traceback(boolean enabled) {
+        if (enabled) {
+            if (this.tracebackRef == 0) {
+                getGlobal("debug");
+                if (isTable(-1)) {
+                    getField(-1, "traceback");
+                    remove(-2);
+                    if (isFunction(-1)) {
+                        this.tracebackRef = ref();
+                    } else {
+                        pop(1);
+                    }
+                } else {
+                    pop(1);
+                }
+            }
+            return;
+        }
+        if (this.tracebackRef != 0) {
+            unref(this.tracebackRef);
+            this.tracebackRef = 0;
         }
     }
 }

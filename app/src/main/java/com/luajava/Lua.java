@@ -22,8 +22,6 @@
 
 package com.luajava;
 
-import android.content.Context;
-
 import com.luajava.value.LuaFunction;
 import com.luajava.value.LuaThread;
 import com.luajava.value.LuaValue;
@@ -1243,6 +1241,8 @@ public interface Lua extends AutoCloseable, LuaThread {
          */
         NONE
     }
+
+    void traceback(boolean enabled);
 
     /**
      * Lua data types
