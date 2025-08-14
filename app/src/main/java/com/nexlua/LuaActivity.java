@@ -539,8 +539,8 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         LuaApplication.setClipboardText(label, text);
     }
 
-    public static void getClipboardText() {
-        LuaApplication.getClipboardText();
+    public static String getClipboardText() {
+        return LuaApplication.getClipboardText();
     }
 
     @Override
