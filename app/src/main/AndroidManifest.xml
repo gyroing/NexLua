@@ -59,7 +59,7 @@
         android:persistent="true"
         android:resizeableActivity="true"
         android:supportsPictureInPicture="true"
-        tools:targetApi="n">
+        tools:targetApi="24">
         <activity
             android:name="com.nexlua.Welcome"
             android:theme="@style/AppTheme"

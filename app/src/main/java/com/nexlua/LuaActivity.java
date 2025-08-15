@@ -57,8 +57,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // 设置主题
-        setTitle(LuaConfig.APP_NAME);
-        setTheme(LuaConfig.APP_THEME);
+        if (LuaConfig.APP_THEME != 0) setTheme(LuaConfig.APP_THEME);
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
         super.onCreate(null);
