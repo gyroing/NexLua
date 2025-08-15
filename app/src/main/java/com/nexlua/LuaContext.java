@@ -53,4 +53,12 @@ public interface LuaContext {
             sendError(e.getClass().getSimpleName(), sw.toString());
         }
     }
+
+    default void initializeLua() {
+        Lua L = getLua();
+        for (String libraryName : new String[]{"package", "string", "table", "math", "io", "os", "debug"})
+            L.openLibrary(libraryName);
+        // traceback
+        L.traceback(true);
+    }
 }

@@ -27,11 +27,13 @@ import java.util.Set;
 public class LuaApplication extends Application implements LuaContext {
     private static LuaApplication mApplication;
     private static final HashMap<String, Object> data = new HashMap<>();
+    private static final String LUA_APPLICATION_ENTRY = "app.lua";
     private SharedPreferences mSharedPreferences;
     private File luaDir, luaFile;
     private String luaLpath, luaCpath;
     private Lua L;
     private LuaValue mOnTerminate, mOnLowMemory, mOnTrimMemory, mOnConfigurationChanged;
+    private int tracebackRef;
 
     @Override
     public void onCreate() {
@@ -41,25 +43,29 @@ public class LuaApplication extends Application implements LuaContext {
         CrashHandler.getInstance().init(this);
         // 获取 luaDir, luaFile, luaCpath, luaLpath
         luaDir = getFilesDir();
-        luaFile = new File(luaDir, "app.lua");
+        luaFile = new File(luaDir, LUA_APPLICATION_ENTRY);
         File luaLibDir = getDir("lua", Context.MODE_PRIVATE);
         File libDir = getDir("lib", Context.MODE_PRIVATE);
         luaCpath = getApplicationInfo().nativeLibraryDir + "/lib?.so;" + libDir + "/lib?.so;";
         luaLpath = luaLibDir + "/?.lua;" + luaLibDir + "/lua/?.lua;" + luaLibDir + "/?/init.lua;";
         try {
-            Log.i("WHAT THE FUCK!", luaDir.getAbsolutePath());
-            Log.i("WHAT THE FUCK!", luaFile.getAbsolutePath());
-            Log.i("WHAT THE FUCK!", String.valueOf(luaFile.exists()));
-            if (luaFile.exists()) {
+            Class<?> clazz = LuaConfig.LUA_DEX_MAP.get(LUA_APPLICATION_ENTRY);
+            if (clazz != null) {
+                initializeLua();
+                LuaModule module = (LuaModule) clazz.newInstance();
+                module.run(this);
+            } else if (luaFile.exists()) {
                 initializeLua();
                 L.load(ByteBuffer.wrap(LuaUtil.readAll(luaFile)), luaFile.getPath());
-                LuaValue mOnCreate = L.getFunction("onCreate");
-                mOnTerminate = L.getFunction("onTerminate");
-                mOnLowMemory = L.getFunction("onLowMemory");
-                mOnTrimMemory = L.getFunction("onTrimMemory");
-                mOnConfigurationChanged = L.getFunction("onConfigurationChanged");
-                if (mOnCreate != null) mOnCreate.call();
+            } else {
+                return;
             }
+            LuaValue mOnCreate = L.getFunction("onCreate");
+            mOnTerminate = L.getFunction("onTerminate");
+            mOnLowMemory = L.getFunction("onLowMemory");
+            mOnTrimMemory = L.getFunction("onTrimMemory");
+            mOnConfigurationChanged = L.getFunction("onConfigurationChanged");
+            if (mOnCreate != null) mOnCreate.call();
         } catch (Exception e) {
             sendError(e);
         }
@@ -181,24 +187,22 @@ public class LuaApplication extends Application implements LuaContext {
     public String getLuaCpath() { return luaCpath; }
     public Context getContext() { return this; }
     // @formatter:on
+    @Override
     public void initializeLua() {
-        L = new LuaJit();
-        for (String libraryName : new String[]{"package", "string", "table", "math", "io", "os", "debug"})
-            L.openLibrary(libraryName);
+        LuaContext.super.initializeLua();
         // Lua Application
+        // package.path 和 cpath
+        L.getGlobal("package");
+        if (L.isTable(-1)) {
+            L.push(getLuaLpath());
+            L.setField(-2, "path");
+            L.push(getLuaCpath());
+            L.setField(-2, "cpath");
+        }
         L.pushJavaObject(this);
         L.pushValue(-1);
         L.setGlobal("application");
         L.setGlobal("this");
-        // package.path 和 cpath
-        L.getGlobal("package");
-        if (L.isTable(-1)) {
-            L.push(luaLpath);
-            L.setField(-2, "path");
-            L.push(luaCpath);
-            L.setField(-2, "cpath");
-        }
-        L.pop(1); // pop package 或 nil
     }
 
     public static void setClipboardText(String text) {

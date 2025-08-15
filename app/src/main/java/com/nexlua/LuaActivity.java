@@ -8,9 +8,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.res.AssetManager;
 import android.content.res.Configuration;
-import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.os.Build;
 import android.os.Bundle;
@@ -40,13 +38,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-
-import dalvik.system.DexClassLoader;
 
 public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnReceiveListener, LuaContext {
-    private LuaDexLoader mLuaDexLoader;
     private int mWidth, mHeight;
     private LuaValue mOnKeyDown, mOnKeyUp, mOnKeyLongPress, mOnKeyShortcut, mOnTouchEvent, mOnAccessibilityEvent;
     private LuaValue mOnCreateOptionsMenu, mOnCreateContextMenu, mOnOptionsItemSelected, mOnMenuItemSelected, mOnContextItemSelected;
@@ -56,14 +49,10 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     private LuaBroadcastReceiver mReceiver;
     private LuaResources mResources;
     private File luaDir, luaFile;
-    private String luaLpath, luaCpath;
-    private Lua L;
+    private String luaPath, luaLpath, luaCpath;
+    private final Lua L = new LuaJit();
     private LuaApplication app;
     private Menu optionsMenu;
-
-    public HashMap<String, String> getLibrarys() {
-        return mLuaDexLoader.getLibrarys();
-    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -84,12 +73,11 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         Intent intent = getIntent();
         luaFile = new File(intent.getStringExtra(LuaContext.LUA_PATH));
         luaDir = luaFile.getParentFile();
+        luaPath = luaFile.getAbsolutePath();
         luaCpath = app.getLuaCpath();
         luaLpath = app.getLuaLpath();
         // 初始化 Lua 环境
         initializeLua();
-        mLuaDexLoader = new LuaDexLoader(this);
-        mLuaDexLoader.loadLibs();
         // 执行 Lua
         try {
             loadLua();
@@ -136,8 +124,20 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         }
     }
 
-    public void loadLua() {
-        doFile(getLuaFile());
+    public void loadLua() throws Exception {
+        String filesPath = getFilesDir().getAbsolutePath() + "/";
+        if (luaPath.startsWith(filesPath)) {
+            String temp = luaPath.substring(filesPath.length());
+            Class<?> clazz = LuaConfig.LUA_DEX_MAP.get(temp);
+            Log.i("FUCK", String.valueOf(clazz));
+            if (clazz != null) {
+                LuaModule module = (LuaModule) clazz.newInstance();
+                module.run(this);
+                Log.i("FUCK", "fuck");
+            } else {
+                doFile(getLuaFile());
+            }
+        }
     }
 
     private boolean isViewInflated = false;
@@ -205,41 +205,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
             }
         }
         return false;
-    }
-
-    public DexClassLoader loadApp(String path) throws LuaException {
-        return mLuaDexLoader.loadApp(path);
-    }
-
-    public DexClassLoader loadDex(String path) throws LuaException {
-        return mLuaDexLoader.loadDex(path);
-    }
-
-    public void loadResources(String path) {
-        mLuaDexLoader.loadResources(path);
-    }
-
-    @Override
-    public AssetManager getAssets() {
-        if (mLuaDexLoader != null && mLuaDexLoader.getAssets() != null)
-            return mLuaDexLoader.getAssets();
-        return super.getAssets();
-    }
-
-    public LuaResources getLuaResources() {
-        Resources superRes = (mLuaDexLoader != null && mLuaDexLoader.getResources() != null) ? mLuaDexLoader.getResources() : super.getResources();
-        mResources = new LuaResources(getAssets(), superRes.getDisplayMetrics(), superRes.getConfiguration());
-        mResources.setSuperResources(superRes);
-        return mResources;
-    }
-
-    @Override
-    public Resources getResources() {
-        if (mLuaDexLoader != null && mLuaDexLoader.getResources() != null)
-            return mLuaDexLoader.getResources();
-        if (mResources != null)
-            return mResources;
-        return super.getResources();
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
@@ -425,60 +390,74 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     // 运行lua脚本
-    public Object doFile(File filePath) {
-        return doFile(filePath, new Object[0]);
+    public void doString(String code, String name, Object... args) {
+        doString(code.getBytes(), name, args);
     }
 
-    public Object doFile(File file, Object[] args) {
-        try {
-            byte[] bytes = LuaUtil.readAll(file);
-            ByteBuffer directBuffer = ByteBuffer.allocateDirect(bytes.length);
-            directBuffer.put(bytes);
-            directBuffer.flip();
-            L.run(directBuffer, file.getPath());
-            if (args != null) for (Object arg : args)
-                L.push(arg, Lua.Conversion.SEMI);
-            return L.toObject(-1);
-        } catch (IOException e) {
-            sendError(e);
-            return null;
+    public void doString(byte[] bytes, String name, Object... args) {
+        synchronized (L) {
+            final int oldTop = L.getTop();
+            try {
+                ByteBuffer directBuffer = ByteBuffer.allocateDirect(bytes.length);
+                directBuffer.put(bytes);
+                directBuffer.flip();
+                L.load(directBuffer, name);
+                int nArgs = 0;
+                if (args != null) {
+                    for (Object arg : args) {
+                        L.push(arg, Lua.Conversion.SEMI);
+                    }
+                    nArgs = args.length;
+                }
+                L.pCall(nArgs, 0);
+            } catch (Exception e) {
+                sendError(e);
+            } finally {
+                L.setTop(oldTop);
+            }
         }
     }
 
-    public Object doAssets(String name, Object[] args) {
+    public void doFile(File filePath) {
+        doFile(filePath, new Object[0]);
+    }
+
+    public void doFile(File file, Object[] args) {
         try {
-            byte[] bytes = LuaUtil.readAsset(this, name);
-            ByteBuffer directBuffer = ByteBuffer.allocateDirect(bytes.length);
-            directBuffer.put(bytes);
-            directBuffer.flip();
-            L.run(directBuffer, name);
-            if (args != null) for (Object arg : args)
-                L.push(arg, Lua.Conversion.SEMI);
-            return L.toObject(-1);
+            doString(LuaUtil.readAll(file), file.getPath(), args);
         } catch (IOException e) {
             sendError(e);
-            return null;
+        }
+    }
+
+    public void doAsset(String name, Object[] args) {
+        try {
+            doString(LuaUtil.readAsset(this, name), name, args);
+        } catch (IOException e) {
+            sendError(e);
         }
     }
 
     //运行lua函数
     public Object runFunc(String funcName, Object... args) {
         synchronized (L) {
-            // 清空 Lua 栈
-            L.setTop(0);
-            L.getGlobal(funcName);
-            if (!L.isFunction(-1)) return null;
-            // 压 traceback 作为错误处理
-            L.getGlobal("debug");
-            L.getField(-1, "traceback");
-            L.remove(-2);
-            L.insert(-2);
-            // 压入参数
-            for (Object arg : args) {
-                L.push(arg, Lua.Conversion.SEMI);
+            final int oldTop = L.getTop();
+            try {
+                L.getGlobal(funcName);
+                if (!L.isFunction(-1)) {
+                    return null;
+                }
+                for (Object arg : args) {
+                    L.push(arg, Lua.Conversion.SEMI);
+                }
+                L.pCall(args.length, 1);
+                return L.toObject(-1);
+            } catch (LuaException e) {
+                sendError(e);
+                return null;
+            } finally {
+                L.setTop(oldTop);
             }
-            L.pCall(args.length, 1);
-            return L.toObject(-1);
         }
     }
 
@@ -488,25 +467,25 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
             String name = intent.getStringExtra(LuaContext.LUA_NEW_ACTIVITY_NAME);
             if (name != null) {
                 Object[] res = (Object[]) intent.getSerializableExtra(LuaContext.LUA_NEW_ACTIVITY_DATA);
+                boolean ret;
                 if (res == null) {
-                    runFunc("onResult", name);
+                    ret = onLuaEvent(mOnResult, name);
                 } else {
                     Object[] arg = new Object[res.length + 1];
                     arg[0] = name;
                     System.arraycopy(res, 0, arg, 1, res.length);
-                    Object ret = runFunc("onResult", arg);
-                    if (ret != null && ret.getClass() == Boolean.class && (Boolean) ret)
-                        return;
+                    ret = onLuaEvent(mOnResult, arg);
                 }
+                if (ret) return;
             }
         }
-        runFunc("onActivityResult", requestCode, resultCode, intent);
+        onLuaEvent(mOnActivityResult, requestCode, resultCode, intent);
         super.onActivityResult(requestCode, resultCode, intent);
     }
 
     public void newActivity(String name, Object... args) {
-        File file = new File(luaDir, name);
-        if (!file.exists()) file = new File(name);
+        File file = new File(name);
+        if (!file.exists()) file = new File(luaDir, name);
         Intent intent = new Intent(this, LuaActivity.class);
         intent.putExtra(LuaContext.LUA_PATH, file.getPath());
         intent.putExtra(LuaContext.LUA_ARG, args);
@@ -514,8 +493,8 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public void newActivityForResult(String name, int requestCode, Object... args) {
-        File file = new File(luaDir, name);
-        if (!file.exists()) file = new File(name);
+        File file = new File(name);
+        if (!file.exists()) file = new File(luaDir, name);
         Intent intent = new Intent(this, LuaActivity.class);
         intent.putExtra(LuaContext.LUA_NEW_ACTIVITY_NAME, file.getPath());
         intent.putExtra(LuaContext.LUA_PATH, file.getPath());
@@ -588,28 +567,26 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     public Lua getLua() { return L; }
     public File getLuaFile() { return luaFile; }
     public File getLuaDir() { return luaDir; }
-    public String getLuaPath() { return luaFile.getPath(); }
+    public String getLuaPath() { return luaPath; }
     public String getLuaLpath() { return luaLpath; }
     public String getLuaCpath() { return luaCpath; }
     public Context getContext() { return this; }
     // @formatter:on
     public void initializeLua() {
-        L = new LuaJit();
-        for (String libraryName : new String[]{"package", "string", "table", "math", "io", "os", "debug"})
-            L.openLibrary(libraryName);
-        // package.path 和 cpath
+        LuaContext.super.initializeLua();
         if (!luaDir.equals(app.getLuaDir())) {
             luaCpath = luaCpath + luaDir + "/lib?.so;";
             luaLpath = luaLpath + luaDir + "/?.lua;" + luaDir + "/lua/?.lua;" + luaDir + "/?/init.lua;";
-            L.getGlobal("package");
-            if (L.isTable(-1)) {
-                L.push(luaLpath);
-                L.setField(-2, "path");
-                L.push(luaCpath);
-                L.setField(-2, "cpath");
-            }
-            L.pop(1); // pop package 或 nil
         }
+        // package.path 和 cpath
+        L.getGlobal("package");
+        if (L.isTable(-1)) {
+            L.push(luaLpath);
+            L.setField(-2, "path");
+            L.push(luaCpath);
+            L.setField(-2, "cpath");
+        }
+        L.pop(1); // pop package 或 nil
         // 插入 LuaActivity
         L.pushJavaObject(this);
         L.pushValue(-1);
