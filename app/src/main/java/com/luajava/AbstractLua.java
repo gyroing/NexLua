@@ -56,7 +56,8 @@ public abstract class AbstractLua implements Lua {
     protected final int id;
     protected final AbstractLua mainThread;
     protected final List<Lua> subThreads;
-    private int tracebackRef = 0;
+    private volatile int tracebackRef = 0;
+    private volatile int ltostringRef = 0;
 
     /**
      * Creates a new Lua (main) state
@@ -381,8 +382,17 @@ public abstract class AbstractLua implements Lua {
 
     @Override
     public @Nullable String ltoString(int index) {
-        try {
+        if (ltostringRef == 0) {
             getGlobal("tostring");
+            if (isFunction(-1)) {
+                ltostringRef = ref();
+            } else {
+                pop(1);
+                return toString(index);
+            }
+        }
+        try {
+            refGet(ltostringRef);
             pushValue(index);
             pCall(1, 1);
             return toString(-1);
