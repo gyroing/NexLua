@@ -40,6 +40,8 @@ public class LuaApplication extends Application implements LuaContext {
         super.onCreate();
         mApplication = this;
         mSharedPreferences = getSharedPreferences(this);
+        // 初始化 LuaUtil, CrashHandler
+        LuaUtil.init(this);
         CrashHandler.getInstance().init(this);
         // 获取 luaDir, luaFile, luaCpath, luaLpath
         luaDir = getFilesDir();
@@ -56,7 +58,7 @@ public class LuaApplication extends Application implements LuaContext {
                 module.run(this);
             } else if (luaFile.exists()) {
                 initializeLua();
-                L.load(ByteBuffer.wrap(LuaUtil.readAll(luaFile)), luaFile.getPath());
+                L.load(LuaUtil.readFileBuffer(luaFile), luaFile.getPath());
             } else {
                 return;
             }

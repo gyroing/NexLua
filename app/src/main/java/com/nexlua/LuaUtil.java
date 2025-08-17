@@ -1,6 +1,9 @@
 package com.nexlua;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.res.AssetFileDescriptor;
+import android.content.res.AssetManager;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -13,301 +16,302 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.List;
-import java.util.zip.Adler32;
-import java.util.zip.CheckedOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-import dalvik.system.DexFile;
-
+@SuppressLint("StaticFieldLeak")
 public final class LuaUtil {
 
     private LuaUtil() {
     }
 
-    private static Context applicationContext;
+    private static Context contextx;
+    private static AssetManager assetManager;
 
-    public static Context getApplicationContext() {
-        if (applicationContext == null) {
-            applicationContext = LuaApplication.getInstance();
-        }
-        return applicationContext;
+    public static void init(Context context) {
+        LuaUtil.contextx = context.getApplicationContext();
+        LuaUtil.assetManager = context.getAssets();
     }
 
-    public static byte[] readAsset(Context context, String name) throws IOException {
-        try (InputStream is = context.getAssets().open(name)) {
-            return readAll(is);
-        }
+    public static Context getContext() {
+        return contextx;
     }
 
-    public static byte[] readAll(InputStream input) throws IOException {
-        try (ByteArrayOutputStream output = new ByteArrayOutputStream(8192)) {
-            byte[] buffer = new byte[8192];
-            int n;
-            while ((n = input.read(buffer)) != -1) {
-                output.write(buffer, 0, n);
+    public static AssetManager getAssetManager() {
+        return assetManager;
+    }
+
+    private static final String ERR_EXCEEDS_SIZE_LIMIT = "File %s size exceeds 2GB limit";
+    private static final String ERR_COULD_NOT_READ_FILE = "Could not completely read file: %s";
+    private static final String ERR_FILE_IS_NOT_DIRECTORY = "File %s is not a directory";
+
+    // FileUtil
+    public static ByteBuffer readFileBuffer(File file) throws IOException {
+        try (FileInputStream fis = new FileInputStream(file);
+             FileChannel channel = fis.getChannel()) {
+            long size = channel.size();
+            if (size > Integer.MAX_VALUE) {
+                throw new IOException(String.format(ERR_EXCEEDS_SIZE_LIMIT, file.getPath()));
             }
-            return output.toByteArray();
+            ByteBuffer buffer = ByteBuffer.allocateDirect((int) size);
+            channel.read(buffer);
+            buffer.flip();
+            return buffer;
         }
     }
 
-    public static ByteBuffer readAll(InputStream input, int size) throws IOException {
-        ByteBuffer buffer = ByteBuffer.allocateDirect(size);
-        byte[] temp = new byte[8192];
-        int n;
-        while ((n = input.read(temp)) != -1) {
-            buffer.put(temp, 0, n);
+    public static byte[] readFileBytes(File file) throws IOException {
+        long fileSize = file.length();
+        if (fileSize > Integer.MAX_VALUE) {
+            throw new IOException(String.format(ERR_EXCEEDS_SIZE_LIMIT, file.getPath()));
         }
-        buffer.flip();
+        byte[] buffer = new byte[(int) fileSize];
+        try (FileInputStream fis = new FileInputStream(file)) {
+            int offset = 0;
+            int numRead;
+            while (offset < buffer.length && (numRead = fis.read(buffer, offset, buffer.length - offset)) >= 0)
+                offset += numRead;
+            if (offset != buffer.length) {
+                throw new IOException(String.format(ERR_COULD_NOT_READ_FILE, file.getPath()));
+            }
+        }
         return buffer;
     }
 
-    public static byte[] readAll(String path) throws IOException {
-        try (FileInputStream fis = new FileInputStream(path)) {
-            return readAll(fis);
-        }
+    public static String readFile(File file) throws IOException {
+        return new String(readFileBytes(file), StandardCharsets.UTF_8);
     }
 
-    public static byte[] readAll(File file) throws IOException {
-        try (FileInputStream fis = new FileInputStream(file)) {
-            return readAll(fis);
+    public static void rmDir(File file) {
+        if (file == null || !file.exists())
+            return;
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    rmDir(child);
+                }
+            }
         }
+        file.delete();
     }
 
-    public static void assetsToSD(Context context, String InFileName, String OutFileName) throws IOException {
-        try (InputStream myInput = context.getAssets().open(InFileName);
-             OutputStream myOutput = new FileOutputStream(OutFileName)) {
-            copyStream(myInput, myOutput);
-            myOutput.flush();
+    public static void copyFile(File srcFile, File destFile) throws IOException {
+        File parentDir = destFile.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
         }
-    }
-
-    public static void copyFile(String from, String to) throws IOException {
-        try (InputStream in = new FileInputStream(from);
-             OutputStream out = new FileOutputStream(to)) {
+        try (InputStream in = new FileInputStream(srcFile);
+             OutputStream out = new FileOutputStream(destFile)) {
             copyStream(in, out);
         }
     }
 
-    public static void copyStream(InputStream in, OutputStream out) throws IOException {
-        byte[] buffer = new byte[8192];
-        int byteread;
-        while ((byteread = in.read(buffer)) != -1) {
-            out.write(buffer, 0, byteread);
+    public static void copyDir(File srcDir, File destDir) throws IOException {
+        if (!srcDir.isDirectory())
+            throw new IOException(String.format(ERR_FILE_IS_NOT_DIRECTORY, srcDir.getPath()));
+        if (!destDir.exists())
+            destDir.mkdirs();
+        File[] children = srcDir.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            File destChild = new File(destDir, child.getName());
+            if (child.isDirectory()) {
+                copyDir(child, destChild);
+            } else {
+                copyFile(child, destChild);
+            }
         }
     }
 
-    public static void copyDir(String from, String to) throws IOException {
-        copyDir(new File(from), new File(to));
+    // Assets Utils
+    public static String[] listAssets(Context context, String assetPath) throws IOException {
+        return context.getAssets().list(assetPath);
     }
 
-    public static void copyDir(File from, File to) throws IOException {
-        if (from.isDirectory()) {
-            to.mkdirs(); // Attempt to create destination directory
-            File[] files = from.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    copyDir(file, new File(to, file.getName()));
+    public static boolean isAssetExists(Context context, String assetPath) {
+        try (InputStream ignored = context.getAssets().open(assetPath)) {
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    public static ByteBuffer readAssetBuffer(String assetPath) throws IOException {
+        AssetManager assetManager = getAssetManager();
+        try (AssetFileDescriptor afd = assetManager.openFd(assetPath);
+             FileInputStream fis = afd.createInputStream();
+             FileChannel channel = fis.getChannel()) {
+            long size = afd.getLength();
+            if (size > Integer.MAX_VALUE)
+                throw new IOException(String.format(ERR_EXCEEDS_SIZE_LIMIT, assetPath));
+            ByteBuffer buffer = ByteBuffer.allocateDirect((int) size);
+            channel.read(buffer);
+            buffer.flip();
+            return buffer;
+        }
+    }
+
+    public static byte[] readAssetBytes(String assetPath) throws IOException {
+        try (InputStream in = getAssetManager().open(assetPath);
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            copyStream(in, out);
+            return out.toByteArray();
+        }
+    }
+
+    public static String readAsset(String assetPath) throws IOException {
+        return new String(readAssetBytes(assetPath), StandardCharsets.UTF_8);
+    }
+
+    public static void copyAssetsDir(String assetPath, File destDir) throws IOException {
+        AssetManager assetManager = getAssetManager();
+        String[] assets = assetManager.list(assetPath);
+        if (!destDir.exists()) {
+            destDir.mkdirs();
+        }
+        for (String asset : assets) {
+            String newAssetPath = assetPath.isEmpty() ? asset : assetPath + File.separator + asset;
+            File newDestFile = new File(destDir, asset);
+            String[] subAssets = assetManager.list(newAssetPath);
+            if (subAssets.length == 0) {
+                copyAssetsFile(newAssetPath, newDestFile);
+            } else {
+                copyAssetsDir(newAssetPath, newDestFile);
+            }
+        }
+    }
+
+    public static void copyAssetsFile(String assetPath, File destFile) throws IOException {
+        File parentDir = destFile.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+        try (InputStream in = getAssetManager().open(assetPath);
+             OutputStream out = new FileOutputStream(destFile)) {
+            copyStream(in, out);
+        }
+    }
+
+    // Stream Utils
+    public static void copyStream(InputStream in, OutputStream out) throws IOException {
+        byte[] buffer = new byte[8192];
+        int bytesRead;
+        while ((bytesRead = in.read(buffer)) != -1) {
+            out.write(buffer, 0, bytesRead);
+        }
+    }
+
+    // Zip Utils
+    public static void zip(File srcFile, File zipFile) throws IOException {
+        try (FileOutputStream fos = new FileOutputStream(zipFile);
+             ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(fos))) {
+            zip(zos, srcFile, "");
+        }
+    }
+
+    private static void zip(ZipOutputStream zos, File file, String baseName) throws IOException {
+        if (file.isDirectory()) {
+            String entryName = baseName + file.getName() + "/";
+            zos.putNextEntry(new ZipEntry(entryName));
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    zip(zos, child, entryName);
                 }
             }
         } else {
-            File destFile = to;
-            if (to.isDirectory()) {
-                destFile = new File(to, from.getName());
-            }
-            try (InputStream in = new FileInputStream(from);
-                 OutputStream out = new FileOutputStream(destFile)) {
-                copyStream(in, out);
+            zos.putNextEntry(new ZipEntry(baseName + file.getName()));
+            try (FileInputStream fis = new FileInputStream(file)) {
+                copyStream(fis, zos);
             }
         }
     }
 
-    public static boolean rmDir(File dir) {
-        if (dir != null && dir.isDirectory()) {
-            File[] files = dir.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    rmDir(file);
-                }
-            }
+    public static void unzip(File zipFile, File destDir) throws IOException {
+        if (!destDir.exists()) {
+            destDir.mkdirs();
         }
-        return dir != null && dir.delete();
-    }
-
-    public static byte[] readZip(String zippath, String filepath) throws IOException {
-        try (ZipFile zip = new ZipFile(zippath)) {
-            ZipEntry entry = zip.getEntry(filepath);
-            // Let zip.getInputStream(entry) throw NullPointerException if entry is null,
-            // which will be caught and re-thrown as an IOException by the caller if not handled.
-            // This adheres to the "let it fail naturally" principle.
-            try (InputStream is = zip.getInputStream(entry)) {
-                return readAll(is);
-            }
-        }
-    }
-
-    private static String getFileHash(InputStream in, String algorithm) throws IOException, NoSuchAlgorithmException {
-        try (InputStream inputStream = in) {
-            MessageDigest digest = MessageDigest.getInstance(algorithm);
-            byte[] buffer = new byte[8192];
-            int len;
-            while ((len = inputStream.read(buffer)) != -1) {
-                digest.update(buffer, 0, len);
-            }
-            BigInteger bigInt = new BigInteger(1, digest.digest());
-            return String.format("%032x", bigInt);
-        }
-    }
-
-    public static String getFileMD5(String file) throws IOException, NoSuchAlgorithmException {
-        return getFileHash(new FileInputStream(file), "MD5");
-    }
-
-    public static String getFileMD5(File file) throws IOException, NoSuchAlgorithmException {
-        return getFileHash(new FileInputStream(file), "MD5");
-    }
-
-    public static String getFileMD5(InputStream in) throws IOException, NoSuchAlgorithmException {
-        return getFileHash(in, "MD5");
-    }
-
-    public static String getFileSha1(String file) throws IOException, NoSuchAlgorithmException {
-        return getFileHash(new FileInputStream(file), "SHA-1");
-    }
-
-    public static String getFileSha1(File file) throws IOException, NoSuchAlgorithmException {
-        return getFileHash(new FileInputStream(file), "SHA-1");
-    }
-
-    public static String getFileSha1(InputStream in) throws IOException, NoSuchAlgorithmException {
-        return getFileHash(in, "SHA-1");
-    }
-
-    public static String getMessageDigest(String in, String algorithm) throws NoSuchAlgorithmException {
-        if (in == null) return null;
-        MessageDigest digest = MessageDigest.getInstance(algorithm);
-        digest.update(in.getBytes());
-        BigInteger bigInt = new BigInteger(1, digest.digest());
-        return String.format("%032x", bigInt);
-    }
-
-    public static String getMD5(String in) throws NoSuchAlgorithmException {
-        return getMessageDigest(in, "MD5");
-    }
-
-    public static String getSha1(String in) throws NoSuchAlgorithmException {
-        return getMessageDigest(in, "SHA-1");
-    }
-
-    public static String[] getAllName(Context context, String path) throws IOException {
-        List<String> ret = new ArrayList<>();
-        DexFile dex = null;
-        try {
-            dex = new DexFile(context.getPackageCodePath());
-            Enumeration<String> cls = dex.entries();
-            while (cls.hasMoreElements()) {
-                ret.add(cls.nextElement());
-            }
-        } finally {
-            if (dex != null) {
-                try {
-                    dex.close();
-                } catch (IOException ignored) {
-                }
-            }
-        }
-        try (ZipFile zip = new ZipFile(path)) {
-            Enumeration<? extends ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements()) {
-                String name = entries.nextElement().getName();
-                if (name.endsWith(".class")) {
-                    ret.add(name.replaceAll("/", ".").replace(".class", ""));
-                }
-            }
-        }
-        return ret.toArray(new String[0]);
-    }
-
-    public static void unZip(String SourceDir, String extDir, String fileExt) throws IOException {
-        File extDirFile = new File(extDir);
-        extDirFile.mkdirs();
-
-        try (ZipFile zip = new ZipFile(SourceDir)) {
+        String destDirPath = destDir.getCanonicalPath();
+        try (ZipFile zip = new ZipFile(zipFile)) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
-                String name = entry.getName();
-                if (!name.startsWith(fileExt)) continue;
-
-                File outputFile = new File(extDir, name);
+                File entryFile = new File(destDir, entry.getName());
+                if (!entryFile.getCanonicalPath().startsWith(destDirPath + File.separator)) {
+                    throw new IOException("Zip entry is trying to escape destination directory: " + entry.getName());
+                }
                 if (entry.isDirectory()) {
-                    outputFile.mkdirs();
+                    entryFile.mkdirs();
                 } else {
-                    File parentDir = outputFile.getParentFile();
-                    if (parentDir != null) {
-                        parentDir.mkdirs();
+                    File parent = entryFile.getParentFile();
+                    if (parent != null && !parent.exists()) {
+                        parent.mkdirs();
                     }
                     try (InputStream in = zip.getInputStream(entry);
-                         FileOutputStream out = new FileOutputStream(outputFile)) {
+                         OutputStream out = new FileOutputStream(entryFile)) {
                         copyStream(in, out);
                     }
                 }
             }
         }
     }
+    // endregion
 
-    public static void zip(String sourceFilePath, String zipFilePath, String zipFileName) throws IOException {
-        File zipFile = new File(zipFilePath, zipFileName);
-        zipFile.getParentFile().mkdirs();
-
-        try (FileOutputStream dest = new FileOutputStream(zipFile);
-             CheckedOutputStream checksum = new CheckedOutputStream(dest, new Adler32());
-             ZipOutputStream out = new ZipOutputStream(new BufferedOutputStream(checksum))) {
-
-            compress(new File(sourceFilePath), out, "");
-        }
-    }
-
-    private static void compress(File file, ZipOutputStream out, String baseDir) throws IOException {
-        if (file.isDirectory()) {
-            File[] fs = file.listFiles();
-            if (fs != null) {
-                for (File f : fs) {
-                    compress(f, out, baseDir + file.getName() + "/");
-                }
-            }
+    // Secure Utils
+    private static String bytesToHex(byte[] bytes) {
+        BigInteger bigInt = new BigInteger(1, bytes);
+        String hex = bigInt.toString(16);
+        int paddingLength = (bytes.length * 2) - hex.length();
+        if (paddingLength > 0) {
+            return String.format("%0" + paddingLength + "d", 0) + hex;
         } else {
-            try (FileInputStream fi = new FileInputStream(file);
-                 BufferedInputStream origin = new BufferedInputStream(fi, 8192)) {
-                ZipEntry entry = new ZipEntry(baseDir + file.getName());
-                out.putNextEntry(entry);
-                byte[] data = new byte[8192];
-                int count;
-                while ((count = origin.read(data)) != -1) {
-                    out.write(data, 0, count);
-                }
-            }
+            return hex;
         }
     }
 
-    public static String readZipFile(String zippath, String filepath) throws IOException {
-        byte[] data = readZip(zippath, filepath);
-        return new String(data);
+    public static String getMessageDigest(String message, String algorithm) throws NoSuchAlgorithmException {
+        return getMessageDigest(message.getBytes(StandardCharsets.UTF_8), algorithm);
     }
 
-    public static String readApkFile(String filepath) throws IOException {
-        try (ZipFile zip = new ZipFile(getApplicationContext().getPackageCodePath())) {
-            // Let getInputStream throw if entry is not found.
-            ZipEntry entry = zip.getEntry(filepath);
-            try (InputStream is = zip.getInputStream(entry)) {
-                return new String(readAll(is));
-            }
+    public static String getMessageDigest(byte[] bytes, String algorithm) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance(algorithm);
+        md.update(bytes);
+        return bytesToHex(md.digest());
+    }
+
+    public static String getMessageDigest(ByteBuffer buffer, String algorithm) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance(algorithm);
+        md.update(buffer);
+        return bytesToHex(md.digest());
+    }
+
+    public static String getFileDigest(File file, String algorithm) throws IOException, NoSuchAlgorithmException {
+        try (InputStream fis = new FileInputStream(file)) {
+            return getStreamDigest(fis, algorithm);
         }
+    }
+
+    public static String getAssetDigest(Context context, String assetPath, String algorithm) throws IOException, NoSuchAlgorithmException {
+        try (InputStream is = context.getAssets().open(assetPath)) {
+            return getStreamDigest(is, algorithm);
+        }
+    }
+
+    public static String getStreamDigest(InputStream in, String algorithm) throws IOException, NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance(algorithm);
+        try (InputStream bis = new BufferedInputStream(in)) {
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = bis.read(buffer)) != -1)
+                md.update(buffer, 0, bytesRead);
+        }
+        return bytesToHex(md.digest());
     }
 }

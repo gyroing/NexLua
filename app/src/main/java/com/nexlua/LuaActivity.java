@@ -8,6 +8,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.res.AssetFileDescriptor;
+import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.content.res.TypedArray;
 import android.os.Build;
@@ -35,8 +37,10 @@ import com.luajava.luajit.LuaJit;
 import com.luajava.value.LuaValue;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 
 public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnReceiveListener, LuaContext {
@@ -393,22 +397,24 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         doString(code.getBytes(), name, args);
     }
 
-    public void doString(byte[] bytes, String name, Object... args) {
+    public void doString(byte[] bytes, String name, Object... arg) {
+        ByteBuffer directBuffer = ByteBuffer.allocateDirect(bytes.length);
+        directBuffer.put(bytes);
+        directBuffer.flip();
+        doString(directBuffer, name, arg);
+    }
+
+    public void doString(ByteBuffer directBuffer, String name, Object... args) {
         synchronized (L) {
             final int oldTop = L.getTop();
             try {
-                ByteBuffer directBuffer = ByteBuffer.allocateDirect(bytes.length);
-                directBuffer.put(bytes);
-                directBuffer.flip();
                 L.load(directBuffer, name);
-                int nArgs = 0;
                 if (args != null) {
-                    for (Object arg : args) {
-                        L.push(arg, Lua.Conversion.SEMI);
-                    }
-                    nArgs = args.length;
+                    for (Object arg : args) L.push(arg, Lua.Conversion.SEMI);
+                    L.pCall(args.length, 0);
+                } else {
+                    L.pCall(0, 0);
                 }
-                L.pCall(nArgs, 0);
             } catch (Exception e) {
                 sendError(e);
             } finally {
@@ -421,9 +427,9 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         doFile(filePath, new Object[0]);
     }
 
-    public void doFile(File file, Object[] args) {
+    public void doFile(File file, Object... args) {
         try {
-            doString(LuaUtil.readAll(file), file.getPath(), args);
+            doString(LuaUtil.readFileBuffer(file), file.getPath(), args);
         } catch (IOException e) {
             sendError(e);
         }
@@ -431,7 +437,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
 
     public void doAsset(String name, Object[] args) {
         try {
-            doString(LuaUtil.readAsset(this, name), name, args);
+            doString(LuaUtil.readAssetBuffer(name), name, args);
         } catch (IOException e) {
             sendError(e);
         }
