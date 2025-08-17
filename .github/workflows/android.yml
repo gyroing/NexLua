@@ -1,26 +1,38 @@
+# نام Workflow شما که در تب Actions نمایش داده می‌شود
 name: Android CI
 
+# مشخص می‌کند این Workflow چه زمانی اجرا شود
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ] # هر وقت کدی به شاخه main یا master پوش شد
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master" ] # هر وقت یک Pull Request برای این شاخه‌ها باز شد
 
 jobs:
   build:
-
+    # مشخص کردن سیستم‌عامل ماشین مجازی (معمولا اوبونتو)
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: set up JDK 11
+    # مرحله ۱: دریافت کد از ریپازیتوری
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # مرحله ۲: نصب جاوا (JDK) که برای بیلد اندروید ضروری است
+    - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
-        java-version: '11'
+        java-version: '17' # نسخه جاوا، بسته به نیاز پروژه ممکن است متفاوت باشد (مثلا 11 یا 8)
         distribution: 'temurin'
-        cache: gradle
+        cache: 'gradle'
 
+    # مرحله ۳: دادن دسترسی اجرایی به فایل gradlew
+    # این فایل مسئول اجرای دستورات Gradle در پروژه است
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+
+    # مرحله ۴: اجرای دستور کامپایل (Build) پروژه
     - name: Build with Gradle
       run: ./gradlew build
+      # اگر فقط می‌خواهید نسخه Debug را بیلد کنید، از دستور زیر استفاده کنید
+      # run: ./gradlew assembleDebug
